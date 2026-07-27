@@ -78,6 +78,55 @@ describe("parseRollout: 旧形式(トップレベル item)", () => {
 	});
 });
 
+describe("parseRollout: 機械挿入テキストの除外", () => {
+	it("AGENTS.md の前置きをユーザー発話として扱わない", () => {
+		const lines = [
+			{
+				timestamp: "2026-02-03T00:38:06.000Z",
+				type: "session_meta",
+				payload: { id: "019c20ef-673a-7b93-b4be-01cdda2af494", cwd: "/Users/me/Work" },
+			},
+			{
+				timestamp: "2026-02-03T00:38:06.100Z",
+				type: "response_item",
+				payload: {
+					type: "message",
+					role: "user",
+					content: [
+						{
+							type: "input_text",
+							text: "# AGENTS.md instructions for /Users/me/Work\n\n<INSTRUCTIONS>\n## Skills\n...\n</INSTRUCTIONS>",
+						},
+					],
+				},
+			},
+			{
+				timestamp: "2026-02-03T00:38:06.200Z",
+				type: "response_item",
+				payload: {
+					type: "message",
+					role: "user",
+					content: [
+						{
+							type: "input_text",
+							text: "<environment_context>\n  <cwd>/Users/me/Work</cwd>\n</environment_context>",
+						},
+					],
+				},
+			},
+			{
+				timestamp: "2026-02-03T00:38:10.000Z",
+				type: "event_msg",
+				payload: { type: "user_message", message: "ghosttyの設定をchezmoiで管理して" },
+			},
+		];
+		const s = parseRollout(lines.map((l) => JSON.stringify(l)).join("\n"))!;
+		expect(s.userMessages).toEqual(["ghosttyの設定をchezmoiで管理して"]);
+		expect(s.firstUserPrompt).toBe("ghosttyの設定をchezmoiで管理して");
+		expect(s.turns).toBe(1);
+	});
+});
+
 describe("parseRollout: 防御的動作", () => {
 	it("空文字・ID不明は null", () => {
 		expect(parseRollout("", "unknown.txt")).toBeNull();

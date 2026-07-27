@@ -26,6 +26,7 @@ export class Ledger {
 			hostname,
 			sessions: {},
 			clusters: {},
+			skipped: {},
 		};
 		this.embeddings = { version: LEDGER_VERSION, model: "", entries: {} };
 	}
@@ -50,6 +51,7 @@ export class Ledger {
 				if (parsed && parsed.sessions && parsed.clusters) {
 					this.data = parsed;
 					this.data.hostname = this.hostname;
+					if (!this.data.skipped) this.data.skipped = {};
 				}
 			}
 		} catch (e) {

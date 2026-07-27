@@ -43,13 +43,17 @@ function extractText(content: unknown): string {
 }
 
 /**
- * Codex はユーザーメッセージとして <environment_context> や <user_instructions>
- * などの機械挿入テキストも記録するため、本物のユーザー発話だけを残す。
+ * Codex はユーザーメッセージとして <environment_context> や <user_instructions>、
+ * AGENTS.md の前置き(`# AGENTS.md instructions for ...`)などの機械挿入テキストも
+ * 記録するため、本物のユーザー発話だけを残す。
  */
+const MACHINE_PREAMBLE_RE = /^#+\s*AGENTS\.md instructions\b/i;
+
 function isRealUserText(text: string): boolean {
 	const t = text.trim();
 	if (t.length === 0) return false;
 	if (t.startsWith("<")) return false;
+	if (MACHINE_PREAMBLE_RE.test(t)) return false;
 	return true;
 }
 

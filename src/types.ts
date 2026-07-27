@@ -53,6 +53,8 @@ export interface LedgerData {
 	hostname: string;
 	sessions: Record<string, StoredSession>; // sessionId -> session
 	clusters: Record<string, StoredCluster>; // clusterId -> cluster
+	/** ユーザー発話が無くスキップした rollout(filePath -> mtime/size)。再スキャン時の再処理を防ぐ */
+	skipped: Record<string, { mtime: number; size: number }>;
 }
 
 export interface EmbeddingCache {

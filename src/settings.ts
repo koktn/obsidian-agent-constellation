@@ -33,7 +33,7 @@ export const DEFAULT_SETTINGS: ACSettings = {
 	similarityLevel: "l2",
 	ollamaEndpoint: "http://localhost:11434",
 	ollamaEmbedModel: "bge-m3",
-	ollamaChatModel: "llama3.2",
+	ollamaChatModel: "gemma4:e4b-mlx",
 	linkThreshold: 0.35,
 	maxLinksPerNote: 5,
 	maxClusterSize: 40,

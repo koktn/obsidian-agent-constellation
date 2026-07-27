@@ -45,4 +45,6 @@ npm run build  # 型チェック + 本番ビルド
 
 ## ステータス
 
-v0.1。設計書のマイルストーン M1〜M6(パーサ+Importer / リンク+ハブノート / Resume / 差分取り込み+監視 / Ollama 統合 / Skill 化フロー)を実装済み。実機(macOS + Obsidian + 実データ)での検証は今後行う。
+v0.1。設計書のマイルストーン M1〜M6(パーサ+Importer / リンク+ハブノート / Resume / 差分取り込み+監視 / Ollama 統合 / Skill 化フロー)を実装済み。
+
+実データ(`~/.codex/sessions` の rollout)でパース〜類似度〜クラスタリング〜ノート生成のパイプライン、Ghostty のコマンド付き起動(`open -na Ghostty --args -e`)、Ollama(gemma4)によるクラスタ命名を検証済み。Obsidian アプリ内 UI(ボタン・設定タブ・ファイル監視)の実機検証は今後行う。

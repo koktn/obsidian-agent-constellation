@@ -94,11 +94,16 @@ export class ConstellationEngine {
 		for (const s of Object.values(this.ledger.data.sessions)) {
 			byPath.set(s.filePath, s);
 		}
+		const skipped = this.ledger.data.skipped;
 
-		const changed = files.filter((f) => {
-			const prev = byPath.get(f.filePath);
-			return !prev || prev.mtime !== f.mtime || prev.size !== f.size;
-		});
+		const changed = opts.rebuildAll
+			? files
+			: files.filter((f) => {
+					const prev = byPath.get(f.filePath);
+					if (prev) return prev.mtime !== f.mtime || prev.size !== f.size;
+					const sk = skipped[f.filePath];
+					return !sk || sk.mtime !== f.mtime || sk.size !== f.size;
+				});
 
 		if (changed.length === 0 && !opts.rebuildAll) {
 			if (!opts.silent) new Notice("Agent Constellation: 新しいセッションはありません。");
@@ -113,9 +118,14 @@ export class ConstellationEngine {
 		try {
 			for (const f of changed) {
 				const parsed = await this.source.parseSessionFile(f.filePath);
-				if (parsed) {
+				if (parsed && parsed.userMessages.length > 0) {
+					delete skipped[f.filePath];
 					this.storeSession(parsed, f.filePath, f.mtime, f.size);
 					imported++;
+				} else {
+					// ユーザー発話が無いセッションはノート化しない(空セッション同士の偽クラスタ防止)
+					skipped[f.filePath] = { mtime: f.mtime, size: f.size };
+					if (parsed) await this.dropSession(parsed.sessionId);
 				}
 				if (progress && imported % 10 === 0) {
 					progress.setMessage(
@@ -136,6 +146,15 @@ export class ConstellationEngine {
 				`Agent Constellation: ${imported} 件のセッションを取り込みました(全 ${Object.keys(this.ledger.data.sessions).length} 件)。`
 			);
 		}
+	}
+
+	/** 以前取り込んだセッションを台帳・ノート・キャッシュから取り除く */
+	private async dropSession(sessionId: string): Promise<void> {
+		const prev = this.ledger.data.sessions[sessionId];
+		if (!prev) return;
+		await this.removeGeneratedNote(prev.notePath);
+		delete this.ledger.data.sessions[sessionId];
+		delete this.ledger.embeddings.entries[sessionId];
 	}
 
 	private storeSession(
