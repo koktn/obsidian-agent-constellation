@@ -1,0 +1,9 @@
+{
+	"id": "agent-constellation",
+	"name": "Agent Constellation",
+	"version": "0.1.0",
+	"minAppVersion": "1.5.0",
+	"description": "Codex CLI のセッション履歴をノート化し、Graph View で星座のように俯瞰・resume・Skill 化する(macOS デスクトップ専用・Node API 使用・テレメトリなし)",
+	"author": "koktn",
+	"isDesktopOnly": true
+}

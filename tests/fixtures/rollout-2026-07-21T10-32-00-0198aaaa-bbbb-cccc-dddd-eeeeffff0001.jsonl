@@ -1,0 +1,13 @@
+{"timestamp":"2026-07-21T01:32:00.000Z","type":"session_meta","payload":{"id":"0198aaaa-bbbb-cccc-dddd-eeeeffff0001","timestamp":"2026-07-21T01:32:00.000Z","cwd":"/Users/me/dev/myapp","originator":"codex_cli_rs","cli_version":"0.20.0"}}
+{"timestamp":"2026-07-21T01:32:01.000Z","type":"turn_context","payload":{"cwd":"/Users/me/dev/myapp","approval_policy":"on-request","model":"gpt-5"}}
+{"timestamp":"2026-07-21T01:32:02.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<user_instructions>機械挿入の指示テキスト</user_instructions>"}]}}
+{"timestamp":"2026-07-21T01:32:03.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"huskyでpre-commitにlint-stagedを設定して"}]}}
+{"timestamp":"2026-07-21T01:33:00.000Z","type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{\"command\":[\"bash\",\"-lc\",\"npm i -D husky lint-staged\"]}","call_id":"call_1"}}
+{"timestamp":"2026-07-21T01:33:30.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_1","output":"added 12 packages"}}
+{"timestamp":"2026-07-21T01:34:00.000Z","type":"event_msg","payload":{"type":"exec_command_begin","call_id":"call_2","command":["bash","-lc","npx husky init"],"cwd":"/Users/me/dev/myapp"}}
+{"timestamp":"2026-07-21T01:35:00.000Z","type":"event_msg","payload":{"type":"patch_apply_begin","call_id":"call_3","auto_approved":true,"changes":{"/Users/me/dev/myapp/.husky/pre-commit":{"add":{"content":"npx lint-staged"}},"/Users/me/dev/myapp/package.json":{"update":{"unified_diff":"..."}}}}}
+{"timestamp":"2026-07-21T01:36:00.000Z","type":"response_item","payload":{"type":"local_shell_call","status":"completed","action":{"type":"exec","command":["git","status"]}}}
+{"timestamp":"2026-07-21T01:39:00.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"husky と lint-staged を設定しました。コミット時に lint が走ります。"}]}}
+{"timestamp":"2026-07-21T01:40:00.000Z","type":"event_msg","payload":{"type":"agent_message","message":"husky と lint-staged を設定しました。コミット時に lint が走ります。"}}
+{"timestamp":"2026-07-21T01:40:01.000Z","type":"event_msg","payload":{"type":"token_count","input_tokens":1234,"output_tokens":567}}
+このJSON以外の壊れた行は無視される

@@ -1,0 +1,27 @@
+{
+	"name": "obsidian-agent-constellation",
+	"version": "0.1.0",
+	"description": "Codex CLI のセッション履歴を Obsidian ノート化し、Graph View で俯瞰・resume・Skill 化するプラグイン",
+	"main": "main.js",
+	"type": "module",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"keywords": [
+		"obsidian-plugin",
+		"codex"
+	],
+	"author": "koktn",
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^20.14.0",
+		"builtin-modules": "^4.0.0",
+		"esbuild": "^0.21.5",
+		"obsidian": "^1.5.7",
+		"typescript": "^5.4.5",
+		"vitest": "^2.0.5"
+	}
+}

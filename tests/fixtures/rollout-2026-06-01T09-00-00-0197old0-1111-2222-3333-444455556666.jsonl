@@ -1,0 +1,5 @@
+{"id":"0197old0-1111-2222-3333-444455556666","timestamp":"2026-06-01T00:00:00.000Z","instructions":null,"cwd":"/Users/me/dev/oldapp"}
+{"type":"message","role":"user","content":[{"type":"input_text","text":"READMEを書いて"}]}
+{"type":"function_call","name":"shell","arguments":"{\"command\":\"ls -la\"}","call_id":"c1"}
+{"type":"function_call","name":"apply_patch","arguments":"{\"input\":\"*** Begin Patch\\n*** Add File: README.md\\n+# oldapp\\n*** End Patch\"}","call_id":"c2"}
+{"type":"message","role":"assistant","content":[{"type":"output_text","text":"READMEを作成しました"}]}

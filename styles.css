@@ -1,0 +1,19 @@
+.agent-constellation-resume,
+.agent-constellation-skill {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	padding: 4px 0;
+}
+
+.agent-constellation-resume button,
+.agent-constellation-skill button {
+	cursor: pointer;
+}
+
+.agent-constellation-resume-cwd {
+	color: var(--text-muted);
+	font-size: var(--font-smaller);
+	overflow-wrap: anywhere;
+}
