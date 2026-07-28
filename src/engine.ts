@@ -9,6 +9,8 @@ import type {
 } from "./types";
 import { Ledger } from "./ledger";
 import { CodexSource, detectRepo } from "./sources/CodexSource";
+import { ClaudeCodeSource } from "./sources/ClaudeCodeSource";
+import type { SessionFileInfo, SessionSource } from "./sources/SessionSource";
 import { TfidfModel, extractKeywords } from "./similarity/tfidf";
 import { combineScore, cosine, l1Score } from "./similarity/similarity";
 import { clusterize, matchClusterIds } from "./similarity/cluster";
@@ -31,17 +33,34 @@ const PROMPT_SEPARATOR = "\n\n---\n\n";
 const GENERATED_RE = /^---[\s\S]*?\bgenerated:\s*true\b[\s\S]*?\n---/;
 
 export class ConstellationEngine {
-	source: CodexSource;
+	sources: SessionSource[];
 	private scanning = false;
 
 	constructor(
 		private app: App,
 		private getSettings: () => ACSettings,
 		public ledger: Ledger,
-		sessionsDir: () => string,
+		codexSessionsDir: () => string,
+		claudeSessionsDir: () => string,
 		private saveSettings: () => Promise<void>
 	) {
-		this.source = new CodexSource(sessionsDir);
+		this.sources = [
+			new CodexSource(codexSessionsDir),
+			new ClaudeCodeSource(claudeSessionsDir),
+		];
+	}
+
+	/** セッションの取り込み元ソース。source 不明時は codex(後方互換) */
+	sourceOf(sourceId: string | null | undefined): SessionSource {
+		return this.sources.find((s) => s.id === sourceId) ?? this.sources[0];
+	}
+
+	buildResumeCommand(
+		sourceId: string | null | undefined,
+		sessionId: string,
+		cwd: string | null
+	): string {
+		return this.sourceOf(sourceId).buildResumeCommand(sessionId, cwd);
 	}
 
 	private get settings(): ACSettings {
@@ -89,7 +108,10 @@ export class ConstellationEngine {
 			return;
 		}
 
-		const files = await this.source.listSessionFiles();
+		const files: { src: SessionSource; f: SessionFileInfo }[] = [];
+		for (const src of this.sources) {
+			for (const f of await src.listSessionFiles()) files.push({ src, f });
+		}
 		const byPath = new Map<string, StoredSession>();
 		for (const s of Object.values(this.ledger.data.sessions)) {
 			byPath.set(s.filePath, s);
@@ -98,7 +120,7 @@ export class ConstellationEngine {
 
 		const changed = opts.rebuildAll
 			? files
-			: files.filter((f) => {
+			: files.filter(({ f }) => {
 					const prev = byPath.get(f.filePath);
 					if (prev) return prev.mtime !== f.mtime || prev.size !== f.size;
 					const sk = skipped[f.filePath];
@@ -116,8 +138,8 @@ export class ConstellationEngine {
 		const counter = { n: 0 };
 		let imported = 0;
 		try {
-			for (const f of changed) {
-				const parsed = await this.source.parseSessionFile(f.filePath);
+			for (const { src, f } of changed) {
+				const parsed = await src.parseSessionFile(f.filePath);
 				if (parsed && parsed.userMessages.length > 0) {
 					delete skipped[f.filePath];
 					this.storeSession(parsed, f.filePath, f.mtime, f.size);
@@ -165,11 +187,12 @@ export class ConstellationEngine {
 	): void {
 		const prev = this.ledger.data.sessions[p.sessionId];
 		const repo = detectRepo(p.cwd) ?? (p.cwd ? p.cwd.split("/").pop() ?? null : null);
-		const title = makeTitle(p.firstUserPrompt, p.sessionId);
+		// ソースがタイトルを持つ場合(Claude Code の ai-title)はそれを優先
+		const title = makeTitle(p.title ?? p.firstUserPrompt, p.sessionId);
 		const text = p.userMessages.join(PROMPT_SEPARATOR).slice(0, MAX_SIMILARITY_TEXT);
 		const stored: StoredSession = {
 			sessionId: p.sessionId,
-			source: "codex",
+			source: p.source,
 			filePath,
 			mtime,
 			size,

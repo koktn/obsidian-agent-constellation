@@ -4,6 +4,11 @@ export function expandHome(p: string, home: string): string {
 	return p;
 }
 
+/** シェルコマンドに埋め込むパスをシングルクォートで包む */
+export function shellQuote(s: string): string {
+	return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
 /** 依存ゼロの軽量ハッシュ(embedding キャッシュのキー用) */
 export function hashText(text: string): string {
 	let h1 = 5381;

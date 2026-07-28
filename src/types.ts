@@ -1,10 +1,15 @@
+/** 対応するエージェントの種別 */
+export type SessionSourceId = "codex" | "claude";
+
 /** JSONL のパース結果(1セッション分) */
 export interface ParsedSession {
 	sessionId: string;
-	source: "codex";
+	source: SessionSourceId;
 	startedAt: string | null;
 	endedAt: string | null;
 	cwd: string | null;
+	/** ソースが持つセッションタイトル(Claude Code の ai-title 等)。無ければ null */
+	title: string | null;
 	firstUserPrompt: string | null;
 	userMessages: string[];
 	lastAssistantMessage: string | null;
@@ -16,7 +21,7 @@ export interface ParsedSession {
 /** 台帳(内部データ層)に保存するセッション情報 */
 export interface StoredSession {
 	sessionId: string;
-	source: "codex";
+	source: SessionSourceId;
 	/** rollout JSONL の絶対パス */
 	filePath: string;
 	mtime: number;

@@ -14,7 +14,8 @@ export async function resumeSession(
 	settings: ACSettings,
 	engine: ConstellationEngine,
 	sessionId: string,
-	cwd: string | null
+	cwd: string | null,
+	sourceId: string | null = null
 ): Promise<void> {
 	if (!sessionId) {
 		new Notice("session_id が見つかりません。");
@@ -26,19 +27,20 @@ export async function resumeSession(
 	const sessionFile = stored?.filePath ?? null;
 	if (sessionFile && !fs.existsSync(sessionFile)) {
 		new Notice(
-			"このマシンにはセッションの実体(~/.codex/sessions)が見つかりません。セッションを実行したマシンで再開してください。",
+			"このマシンにはセッションの実体が見つかりません。セッションを実行したマシンで再開してください。",
 			8000
 		);
 		return;
 	}
 
+	const source = sourceId ?? stored?.source ?? null;
 	const effectiveCwd = cwd && cwd.length > 0 ? cwd : (stored?.cwd ?? null);
-	const command = engine.source.buildResumeCommand(sessionId, effectiveCwd);
+	const command = engine.buildResumeCommand(source, sessionId, effectiveCwd);
 
 	if (effectiveCwd && !fs.existsSync(effectiveCwd)) {
 		new MissingCwdModal(app, effectiveCwd, async (choice) => {
 			if (choice === "home") {
-				const homeCmd = engine.source.buildResumeCommand(sessionId, os.homedir());
+				const homeCmd = engine.buildResumeCommand(source, sessionId, os.homedir());
 				await runInTerminal(settings.terminal, homeCmd);
 			} else if (choice === "copy") {
 				await navigator.clipboard.writeText(command);

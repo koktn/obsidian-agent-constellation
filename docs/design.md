@@ -26,7 +26,7 @@ Codex CLI の実行履歴(セッション)を Obsidian のノートとして取�
 | 言語 | UI・生成ノートともに日本語前提 |
 | 実行環境 | macOS / Obsidian デスクトップ版のみ(Node API 使用のため `isDesktopOnly: true`) |
 | ネットワーク | ローカル完結。外部 API 不使用(Ollama はローカルなので許容) |
-| 対象ツール | まず Codex CLI(`~/.codex/sessions/**/rollout-*.jsonl`)。将来他エージェントへ拡張可能な設計 |
+| 対象ツール | Codex CLI(`~/.codex/sessions/**/rollout-*.jsonl`)と Claude Code(`~/.claude/projects/*/<uuid>.jsonl`)。`SessionSource` 実装の追加でさらに拡張可能 |
 | 可視化 | Obsidian 標準 Graph View を使用(カスタム View は当面作らない) |
 | データ配置 | 現在の Vault 内にプラグイン用ディレクトリを作成 |
 
@@ -59,8 +59,9 @@ Codex CLI の実行履歴(セッション)を Obsidian のノートとして取�
 ```
 ┌─ Obsidian Plugin (TypeScript) ─────────────────────────┐
 │                                                        │
-│  SessionSource (interface)  ← 将来の他エージェント対応   │
-│    └─ CodexSource: ~/.codex/sessions を fs で読む       │
+│  SessionSource (interface)  ← 実装追加でエージェント拡張  │
+│    ├─ CodexSource: ~/.codex/sessions を fs で読む       │
+│    └─ ClaudeCodeSource: ~/.claude/projects を fs で読む │
 │                                                        │
 │  Importer   : JSONL → セッションノート (.md) 生成        │
 │  Similarity : 類似度計算(段階式、§6)                   │
@@ -207,6 +208,8 @@ Graph View 上ではハブがリンク数に比例して大きく描画される
 
 - セッションノートの「▶ 再開」ボタン、またはコマンドパレット
   「Agent Constellation: このセッションを再開」から実行。
+- resume コマンドはセッションのソースに応じて発行する
+  (Codex: `codex resume <id>` / Claude Code: `claude --resume <id>`)。
 - 実装: `child_process` + AppleScript でターミナル起動
 
 ```
@@ -252,6 +255,7 @@ end tell
 
 - ノートフォルダ名(既定: `_Constellation`)
 - Codex セッションディレクトリ(既定: `~/.codex/sessions`)
+- Claude Code セッションディレクトリ(既定: `~/.claude/projects`)
 - 自動スキャン間隔 / ファイル監視の有効化
 - 類似度: L2/L3 の選択、Ollama エンドポイント・モデル名、リンク閾値
 - クラスタ: Skill 候補化の閾値

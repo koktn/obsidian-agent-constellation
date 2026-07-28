@@ -1,6 +1,6 @@
 # Agent Constellation
 
-Codex CLI の実行履歴(セッション)を Obsidian のノートとして取り込み、標準 Graph View 上で「星座」のように俯瞰・探索できるようにする Obsidian プラグイン。
+Codex CLI / Claude Code の実行履歴(セッション)を Obsidian のノートとして取り込み、標準 Graph View 上で「星座」のように俯瞰・探索できるようにする Obsidian プラグイン。
 
 類似セッションのクラスタを検出し、次の 2 つへの導線を提供する:
 
@@ -14,11 +14,11 @@ Codex CLI の実行履歴(セッション)を Obsidian のノートとして取�
 
 ## 主な機能
 
-- `~/.codex/sessions/**/rollout-*.jsonl` をスキャンし、`_Constellation/sessions/` にセッションノートを生成(差分取り込み・進捗表示付き)
+- `~/.codex/sessions/**/rollout-*.jsonl`(Codex CLI)と `~/.claude/projects/*/<uuid>.jsonl`(Claude Code)をスキャンし、`_Constellation/sessions/` にセッションノートを生成(差分取り込み・進捗表示付き。ユーザー発話の無い空セッションは除外)
 - 類似度計算は段階式: L1(同一 repo/cwd + 変更ファイルの Jaccard)+ L2(文字 bi-gram TF-IDF、依存ゼロ)、設定で L3(Ollama embedding)に切替可能
 - 類似セッションを貪欲クラスタリングし、`_Constellation/clusters/` にハブノートを生成。Graph View 上で「大きいノード = 繰り返しているタスク = Skill 候補」が視覚的に一致する
 - クラスタの所属数が閾値(既定 5)に達すると `#skill-candidate` タグを付与(Graph View のグループ色分けで光らせられる)
-- セッションノートの「▶ このセッションを再開」ボタンで Terminal.app / Ghostty を起動(またはコマンドをコピー)
+- セッションノートの「▶ このセッションを再開」ボタンで Terminal.app / Ghostty を起動(またはコマンドをコピー)。Codex は `codex resume`、Claude Code は `claude --resume` を発行
 - ハブノートの「Codex に渡して Skill 化」ボタンでクラスタブリーフを生成し、skill-creator を起動
 - 自動スキャン間隔・ファイル監視・取り込み担当マシンのロック(Vault 同期環境向け)に対応
 - プラグインが上書きするのは frontmatter に `generated: true` を持つノートのみ。フラグを外せば手動編集を保護できる
@@ -47,4 +47,4 @@ npm run build  # 型チェック + 本番ビルド
 
 v0.1。設計書のマイルストーン M1〜M6(パーサ+Importer / リンク+ハブノート / Resume / 差分取り込み+監視 / Ollama 統合 / Skill 化フロー)を実装済み。
 
-実データ(`~/.codex/sessions` の rollout)でパース〜類似度〜クラスタリング〜ノート生成のパイプライン、Ghostty のコマンド付き起動(`open -na Ghostty --args -e`)、Ollama(gemma4)によるクラスタ命名を検証済み。Obsidian アプリ内 UI(ボタン・設定タブ・ファイル監視)の実機検証は今後行う。
+実データ(`~/.codex/sessions` の rollout と `~/.claude/projects` のセッション)でパース〜類似度(L2/L3)〜クラスタリング〜ノート生成のパイプライン、Ghostty のコマンド付き起動(`open -na Ghostty --args -e`)、Ollama(gemma4)によるクラスタ命名を検証済み。Obsidian アプリ内 UI(ボタン・設定タブ・ファイル監視)の実機検証は今後行う。

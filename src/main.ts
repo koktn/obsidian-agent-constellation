@@ -20,7 +20,7 @@ export default class AgentConstellationPlugin extends Plugin {
 	engine!: ConstellationEngine;
 	ledger!: Ledger;
 
-	private watcher: fs.FSWatcher | null = null;
+	private watchers: fs.FSWatcher[] = [];
 	private watchDebounce: number | null = null;
 	private autoScanInterval: number | null = null;
 
@@ -28,8 +28,12 @@ export default class AgentConstellationPlugin extends Plugin {
 		return os.hostname();
 	}
 
-	sessionsDir(): string {
+	codexSessionsDir(): string {
 		return expandHome(this.settings.codexSessionsDir, os.homedir());
+	}
+
+	claudeSessionsDir(): string {
+		return expandHome(this.settings.claudeSessionsDir, os.homedir());
 	}
 
 	async onload(): Promise<void> {
@@ -46,7 +50,8 @@ export default class AgentConstellationPlugin extends Plugin {
 			this.app,
 			() => this.settings,
 			this.ledger,
-			() => this.sessionsDir(),
+			() => this.codexSessionsDir(),
+			() => this.claudeSessionsDir(),
 			() => this.saveSettings()
 		);
 
@@ -82,7 +87,8 @@ export default class AgentConstellationPlugin extends Plugin {
 					this.settings,
 					this.engine,
 					sessionId,
-					typeof fm?.cwd === "string" ? fm.cwd : null
+					typeof fm?.cwd === "string" ? fm.cwd : null,
+					typeof fm?.source === "string" ? fm.source : null
 				);
 				return true;
 			},
@@ -157,27 +163,27 @@ export default class AgentConstellationPlugin extends Plugin {
 	restartWatcher(): void {
 		this.stopWatcher();
 		if (!this.settings.watchEnabled) return;
-		const dir = this.sessionsDir();
-		if (!fs.existsSync(dir)) return;
-		try {
-			// macOS は recursive watch に対応
-			this.watcher = fs.watch(dir, { recursive: true }, () => {
-				if (this.watchDebounce !== null) window.clearTimeout(this.watchDebounce);
-				this.watchDebounce = window.setTimeout(
-					() => void this.engine.scan({ silent: true }),
-					5_000
-				);
-			});
-		} catch (e) {
-			console.error("[agent-constellation] ファイル監視の開始に失敗しました", e);
+		for (const dir of [this.codexSessionsDir(), this.claudeSessionsDir()]) {
+			if (!fs.existsSync(dir)) continue;
+			try {
+				// macOS は recursive watch に対応
+				const watcher = fs.watch(dir, { recursive: true }, () => {
+					if (this.watchDebounce !== null) window.clearTimeout(this.watchDebounce);
+					this.watchDebounce = window.setTimeout(
+						() => void this.engine.scan({ silent: true }),
+						5_000
+					);
+				});
+				this.watchers.push(watcher);
+			} catch (e) {
+				console.error(`[agent-constellation] ファイル監視の開始に失敗しました: ${dir}`, e);
+			}
 		}
 	}
 
 	private stopWatcher(): void {
-		if (this.watcher) {
-			this.watcher.close();
-			this.watcher = null;
-		}
+		for (const w of this.watchers) w.close();
+		this.watchers = [];
 		if (this.watchDebounce !== null) {
 			window.clearTimeout(this.watchDebounce);
 			this.watchDebounce = null;
@@ -214,13 +220,14 @@ export default class AgentConstellationPlugin extends Plugin {
 		const params = this.parseBlockParams(source);
 		const sessionId = params["session_id"] ?? "";
 		const cwd = params["cwd"] || null;
+		const sourceId = params["source"] || null;
 
 		const container = el.createDiv({ cls: "agent-constellation-resume" });
 		const button = container.createEl("button", {
 			text: "▶ このセッションを再開",
 		});
 		button.addEventListener("click", () => {
-			void resumeSession(this.app, this.settings, this.engine, sessionId, cwd);
+			void resumeSession(this.app, this.settings, this.engine, sessionId, cwd, sourceId);
 		});
 		if (cwd) {
 			container.createEl("span", {
@@ -277,7 +284,7 @@ class SetupGuideModal extends Modal {
 
 		contentEl.createEl("p", {
 			text:
-				"コマンドパレットの「セッションを取り込む(スキャン)」で Codex のセッションが " +
+				"コマンドパレットの「セッションを取り込む(スキャン)」で Codex CLI / Claude Code のセッションが " +
 				`${this.noteFolder}/ 配下のノートになります。`,
 		});
 

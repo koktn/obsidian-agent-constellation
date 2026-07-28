@@ -143,6 +143,7 @@ export function renderSessionNote(
 	body.push(
 		"```resume",
 		`session_id: ${s.sessionId}`,
+		`source: ${s.source}`,
 		`cwd: ${s.cwd ?? ""}`,
 		"```",
 		""

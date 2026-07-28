@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { parseRollout } from "../parser/codexParser";
+import { shellQuote } from "../utils";
 import type { ParsedSession } from "../types";
 import type { SessionFileInfo, SessionSource } from "./SessionSource";
 
@@ -58,10 +59,6 @@ export class CodexSource implements SessionSource {
 		const resume = `codex resume ${sessionId}`;
 		return cwd ? `cd ${shellQuote(cwd)} && ${resume}` : resume;
 	}
-}
-
-function shellQuote(s: string): string {
-	return `'${s.replace(/'/g, `'\\''`)}'`;
 }
 
 /** cwd から Git リポジトリ名を検出する(.git を上方向に探索) */

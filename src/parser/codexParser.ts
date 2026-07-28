@@ -1,4 +1,12 @@
 import type { ParsedSession } from "../types";
+import {
+	MAX_COMMANDS,
+	MAX_FILES,
+	MAX_TEXT_PER_MESSAGE,
+	asString,
+	normalizeCommand,
+	relativizeFiles,
+} from "./common";
 
 /**
  * Codex CLI の rollout JSONL パーサ。
@@ -11,17 +19,9 @@ const FILE_NAME_RE =
 
 const PATCH_FILE_RE = /^\*\*\*\s+(?:Add|Update|Delete)\s+File:\s+(.+)\s*$/gm;
 
-const MAX_COMMANDS = 50;
-const MAX_FILES = 50;
-const MAX_COMMAND_LEN = 200;
-
 export function sessionIdFromFileName(fileName: string): string | null {
 	const m = FILE_NAME_RE.exec(fileName);
 	return m ? m[1] : null;
-}
-
-function asString(v: unknown): string | null {
-	return typeof v === "string" && v.length > 0 ? v : null;
 }
 
 /** message の content からテキストを取り出す(文字列 / {text} 配列の両対応) */
@@ -55,31 +55,6 @@ function isRealUserText(text: string): boolean {
 	if (t.startsWith("<")) return false;
 	if (MACHINE_PREAMBLE_RE.test(t)) return false;
 	return true;
-}
-
-/** command が ["bash","-lc","..."] 形式なら中身だけを取り出して1行にする */
-function normalizeCommand(command: unknown): string | null {
-	let parts: string[];
-	if (typeof command === "string") {
-		parts = [command];
-	} else if (Array.isArray(command)) {
-		parts = command.filter((c): c is string => typeof c === "string");
-	} else {
-		return null;
-	}
-	if (parts.length === 0) return null;
-	if (
-		parts.length >= 3 &&
-		["bash", "zsh", "sh"].includes(parts[0]) &&
-		["-lc", "-c", "-lic"].includes(parts[1])
-	) {
-		parts = [parts.slice(2).join(" ")];
-	}
-	const joined = parts.join(" ").replace(/\s+/g, " ").trim();
-	if (joined.length === 0) return null;
-	return joined.length > MAX_COMMAND_LEN
-		? joined.slice(0, MAX_COMMAND_LEN) + " …"
-		: joined;
 }
 
 function filesFromPatchText(patch: string): string[] {
@@ -210,15 +185,6 @@ function handleEvent(acc: Acc, p: Record<string, unknown>): void {
 	}
 }
 
-/** cwd 配下の絶対パスを相対パスに直す */
-function relativizeFiles(files: string[], cwd: string | null): string[] {
-	if (!cwd) return files;
-	const prefix = cwd.endsWith("/") ? cwd : cwd + "/";
-	return files.map((f) => (f.startsWith(prefix) ? f.slice(prefix.length) : f));
-}
-
-const MAX_TEXT_PER_MESSAGE = 4000;
-
 /**
  * rollout JSONL の全文をパースする。
  * 1行も解釈できない・セッションIDが特定できない場合は null。
@@ -296,6 +262,7 @@ export function parseRollout(content: string, fileName = ""): ParsedSession | nu
 		startedAt: acc.startedAt,
 		endedAt: acc.endedAt,
 		cwd: acc.cwd,
+		title: null,
 		firstUserPrompt: userMessages[0] ?? null,
 		userMessages,
 		lastAssistantMessage: acc.lastAssistantMessage,

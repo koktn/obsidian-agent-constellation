@@ -7,6 +7,7 @@ export type SimilarityLevel = "l2" | "l3";
 export interface ACSettings {
 	noteFolder: string;
 	codexSessionsDir: string;
+	claudeSessionsDir: string;
 	/** 自動スキャン間隔(分)。0 で無効 */
 	autoScanIntervalMin: number;
 	watchEnabled: boolean;
@@ -28,6 +29,7 @@ export interface ACSettings {
 export const DEFAULT_SETTINGS: ACSettings = {
 	noteFolder: "_Constellation",
 	codexSessionsDir: "~/.codex/sessions",
+	claudeSessionsDir: "~/.claude/projects",
 	autoScanIntervalMin: 30,
 	watchEnabled: false,
 	similarityLevel: "l2",
@@ -84,6 +86,18 @@ export class ACSettingTab extends PluginSettingTab {
 					.setValue(s.codexSessionsDir)
 					.onChange(async (v) => {
 						s.codexSessionsDir = v.trim() || DEFAULT_SETTINGS.codexSessionsDir;
+						await save();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Claude Code セッションディレクトリ")
+			.setDesc("<uuid>.jsonl の置き場所(既定: ~/.claude/projects)")
+			.addText((t) =>
+				t.setPlaceholder(DEFAULT_SETTINGS.claudeSessionsDir)
+					.setValue(s.claudeSessionsDir)
+					.onChange(async (v) => {
+						s.claudeSessionsDir = v.trim() || DEFAULT_SETTINGS.claudeSessionsDir;
 						await save();
 					})
 			);
