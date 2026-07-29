@@ -6,6 +6,7 @@ import type { ConstellationEngine } from "../engine";
 import type { StoredCluster, StoredSession } from "../types";
 import { renderBrief, sanitizeFileName } from "../noteRenderer";
 import { runInTerminal } from "./terminal";
+import { t } from "../i18n";
 
 /**
  * Skill 化フロー(設計書 §8)。
@@ -19,7 +20,7 @@ function getCluster(
 ): { cluster: StoredCluster; sessions: StoredSession[] } | null {
 	const cluster = engine.ledger.data.clusters[clusterId];
 	if (!cluster) {
-		new Notice(`クラスタ ${clusterId} が見つかりません。再スキャンしてください。`);
+		new Notice(t("notice.clusterNotFoundRescan", { id: clusterId }));
 		return null;
 	}
 	const sessions = cluster.members
@@ -47,7 +48,7 @@ export async function generateBrief(
 		`${folder}/${sanitizeFileName(`brief - ${cluster.name}`)}.md`
 	);
 	await engine.writeGeneratedNote(path, content);
-	new Notice(`ブリーフを生成しました: ${path}`);
+	new Notice(t("notice.briefCreated", { path }));
 
 	// 生成したブリーフを新しいタブで開く
 	const file = app.vault.getAbstractFileByPath(path);
@@ -100,12 +101,12 @@ export async function markPromoted(
 ): Promise<void> {
 	const cluster = engine.ledger.data.clusters[clusterId];
 	if (!cluster) {
-		new Notice(`クラスタ ${clusterId} が見つかりません。`);
+		new Notice(t("notice.clusterNotFound", { id: clusterId }));
 		return;
 	}
 	// 全クラスタの再計算はせず、当該クラスタのハブノートだけ書き直す
 	cluster.skillStatus = "promoted";
 	await engine.writeClusterNote(clusterId);
 	await engine.ledger.save();
-	new Notice(`クラスタ「${cluster.name}」を promoted にしました。`);
+	new Notice(t("notice.markedPromoted", { name: cluster.name }));
 }

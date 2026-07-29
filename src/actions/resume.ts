@@ -4,6 +4,7 @@ import * as os from "os";
 import type { ACSettings } from "../settings";
 import type { ConstellationEngine } from "../engine";
 import { runInTerminal } from "./terminal";
+import { t } from "../i18n";
 
 /**
  * Resume 機能(設計書 §7・§12)。
@@ -18,7 +19,7 @@ export async function resumeSession(
 	sourceId: string | null = null
 ): Promise<void> {
 	if (!sessionId) {
-		new Notice("session_id が見つかりません。");
+		new Notice(t("notice.noSessionId"));
 		return;
 	}
 
@@ -26,10 +27,7 @@ export async function resumeSession(
 	const stored = engine.ledger.data.sessions[sessionId];
 	const sessionFile = stored?.filePath ?? null;
 	if (sessionFile && !fs.existsSync(sessionFile)) {
-		new Notice(
-			"このマシンにはセッションの実体が見つかりません。セッションを実行したマシンで再開してください。",
-			8000
-		);
+		new Notice(t("notice.noSessionFile"), 8000);
 		return;
 	}
 
@@ -44,7 +42,7 @@ export async function resumeSession(
 				await runInTerminal(settings.terminal, homeCmd, os.homedir());
 			} else if (choice === "copy") {
 				await navigator.clipboard.writeText(command);
-				new Notice("コマンドをクリップボードにコピーしました。");
+				new Notice(t("notice.copied"));
 			}
 		}).open();
 		return;
@@ -66,13 +64,13 @@ class MissingCwdModal extends Modal {
 
 	onOpen(): void {
 		const { contentEl } = this;
-		contentEl.createEl("h3", { text: "作業ディレクトリが見つかりません" });
+		contentEl.createEl("h3", { text: t("modal.missingCwd.title") });
 		contentEl.createEl("p", {
-			text: `元の作業ディレクトリ ${this.cwd} は存在しません。どうしますか?`,
+			text: t("modal.missingCwd.body", { cwd: this.cwd }),
 		});
 		new Setting(contentEl)
 			.addButton((b) =>
-				b.setButtonText("ホームディレクトリで再開")
+				b.setButtonText(t("modal.missingCwd.home"))
 					.setCta()
 					.onClick(() => {
 						this.close();
@@ -80,13 +78,13 @@ class MissingCwdModal extends Modal {
 					})
 			)
 			.addButton((b) =>
-				b.setButtonText("コマンドをコピーのみ").onClick(() => {
+				b.setButtonText(t("modal.missingCwd.copy")).onClick(() => {
 					this.close();
 					this.onChoose("copy");
 				})
 			)
 			.addButton((b) =>
-				b.setButtonText("キャンセル").onClick(() => {
+				b.setButtonText(t("modal.missingCwd.cancel")).onClick(() => {
 					this.close();
 					this.onChoose("cancel");
 				})

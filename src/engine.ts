@@ -27,6 +27,7 @@ import {
 	summarizeCommonPatterns,
 } from "./noteRenderer";
 import { hashText, yieldEvery } from "./utils";
+import { t } from "./i18n";
 
 const MAX_SIMILARITY_TEXT = 8000;
 const PROMPT_SEPARATOR = "\n\n---\n\n";
@@ -100,7 +101,7 @@ export class ConstellationEngine {
 			}
 			console.error("[agent-constellation] スキャン失敗", e);
 			new Notice(
-				`Agent Constellation: スキャンに失敗しました(台帳は巻き戻しました): ${e instanceof Error ? e.message : String(e)}`
+				t("notice.scanFailed", { msg: e instanceof Error ? e.message : String(e) })
 			);
 		} finally {
 			this.scanning = false;
@@ -113,7 +114,7 @@ export class ConstellationEngine {
 		if (!lock.ok) {
 			if (!opts.silent) {
 				new Notice(
-					`Agent Constellation: このマシンは取り込み担当ではありません(担当: ${this.settings.importHostname})。閲覧と resume のみ利用できます。`
+					t("notice.notImportHost", { host: this.settings.importHostname })
 				);
 			}
 			return;
@@ -139,13 +140,13 @@ export class ConstellationEngine {
 				});
 
 		if (changed.length === 0 && !opts.rebuildAll) {
-			if (!opts.silent) new Notice("Agent Constellation: 新しいセッションはありません。");
+			if (!opts.silent) new Notice(t("notice.noNewSessions"));
 			return;
 		}
 
 		const progress = opts.silent
 			? null
-			: new Notice(`Agent Constellation: 取り込み中… (0/${changed.length})`, 0);
+			: new Notice(t("notice.importing", { n: 0, total: changed.length }), 0);
 		const counter = { n: 0 };
 		let imported = 0;
 		try {
@@ -162,13 +163,13 @@ export class ConstellationEngine {
 				}
 				if (progress && imported % 10 === 0) {
 					progress.setMessage(
-						`Agent Constellation: 取り込み中… (${imported}/${changed.length})`
+						t("notice.importing", { n: imported, total: changed.length })
 					);
 				}
 				await yieldEvery(counter, 5);
 			}
 
-			if (progress) progress.setMessage("Agent Constellation: リンク・クラスタを計算中…");
+			if (progress) progress.setMessage(t("notice.computing"));
 			await this.recomputeAndWrite();
 			await this.ledger.save();
 		} finally {
@@ -176,7 +177,10 @@ export class ConstellationEngine {
 		}
 		if (!opts.silent) {
 			new Notice(
-				`Agent Constellation: ${imported} 件のセッションを取り込みました(全 ${Object.keys(this.ledger.data.sessions).length} 件)。`
+				t("notice.imported", {
+					n: imported,
+					total: Object.keys(this.ledger.data.sessions).length,
+				})
 			);
 		}
 	}
@@ -247,9 +251,7 @@ export class ConstellationEngine {
 		if (s.similarityLevel === "l3") {
 			const fn = await this.embeddingSimilarity(sessions);
 			if (fn) return fn;
-			new Notice(
-				"Agent Constellation: Ollama に接続できないため、TF-IDF(L2)で計算します。"
-			);
+			new Notice(t("notice.ollamaFallback"));
 		}
 		const docs = new Map(sessions.map((x) => [x.sessionId, x.text || x.title]));
 		const model = new TfidfModel(docs);

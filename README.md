@@ -1,5 +1,11 @@
 # Agent Constellation
 
+Import Codex CLI and Claude Code session history as notes, explore them like constellations in Obsidian's graph view, resume past sessions from a note, and turn repeated patterns into skills.
+
+An Obsidian plugin for macOS (desktop only). Everything runs locally: no external network calls, no telemetry. UI (commands, settings, notices) is available in English and Japanese, following Obsidian's display language. Generated notes are currently Japanese. See the [Disclosures](#disclosures--開示事項) section for what this plugin accesses outside your vault.
+
+---
+
 Codex CLI / Claude Code の実行履歴(セッション)を Obsidian のノートとして取り込み、標準 Graph View 上で「星座」のように俯瞰・探索できるようにする Obsidian プラグイン。
 
 類似セッションのクラスタを検出し、次の 2 つへの導線を提供する:
@@ -11,6 +17,23 @@ Codex CLI / Claude Code の実行履歴(セッション)を Obsidian のノー�
 - 対象環境: macOS / Obsidian デスクトップ版のみ(`isDesktopOnly: true`、Node API 使用)
 - ローカル完結(外部 API 不使用。Ollama はローカルのためオプションで利用)
 - テレメトリなし
+- UI(コマンド・設定・通知)は Obsidian の表示言語に従い英語/日本語に対応(生成ノート本文は日本語)
+
+## Disclosures / 開示事項
+
+This plugin uses Node APIs on desktop and accesses resources outside your vault. Nothing leaves your machine.
+
+1. **Reads files outside the vault**: session history under `~/.codex/sessions` (Codex CLI) and `~/.claude/projects` (Claude Code), read-only, via Node `fs`. The directories are configurable. Session content may contain sensitive data; notes therefore include only the prompt excerpt, a short summary, and command/file lists — never the full transcript.
+2. **Launches external processes**: only when you click a resume / skill button (or run the resume command), the plugin opens Terminal.app (via `osascript`) or Ghostty with a `codex resume` / `claude --resume` / skill-creator command, using Node `child_process`. You can instead choose "copy command to clipboard only" in settings.
+3. **Network**: no external network access. Optionally connects to a local Ollama instance (`http://localhost:11434` by default, configurable) for embeddings and cluster naming. The plugin is fully functional without Ollama.
+4. **No telemetry**: the plugin collects and sends nothing.
+
+本プラグインはデスクトップ版の Node API を使用し、Vault の外にアクセスします。データがマシンの外に出ることはありません。
+
+1. **Vault 外のファイル読み取り**: `~/.codex/sessions`(Codex CLI)と `~/.claude/projects`(Claude Code)のセッション履歴を Node `fs` で読み取り専用アクセスします(ディレクトリは設定で変更可)。セッションには機密が含まれうるため、ノートにはプロンプト冒頭・要約・コマンド/ファイル一覧のみを転記し、全文は転記しません。
+2. **外部プロセスの起動**: resume / Skill 化のボタンを押したときのみ、`child_process` で Terminal.app(`osascript` 経由)または Ghostty を起動し、`codex resume` / `claude --resume` / skill-creator のコマンドを渡します。設定で「クリップボードにコピーのみ」も選べます。
+3. **ネットワーク**: 外部への通信はありません。オプションでローカルの Ollama(既定 `http://localhost:11434`、変更可)に接続し、embedding とクラスタ命名に使います。Ollama なしでも全機能が動作します。
+4. **テレメトリなし**: 収集・送信は一切行いません。
 
 ## 主な機能
 
@@ -65,4 +88,4 @@ npm run build  # 型チェック + 本番ビルド
 
 v0.1。設計書のマイルストーン M1〜M6(パーサ+Importer / リンク+ハブノート / Resume / 差分取り込み+監視 / Ollama 統合 / Skill 化フロー)を実装済み。
 
-実データ(`~/.codex/sessions` の rollout と `~/.claude/projects` のセッション)でパース〜類似度(L2/L3)〜クラスタリング〜ノート生成のパイプライン、Ghostty のコマンド付き起動(`open -na Ghostty --args -e`)、Ollama(gemma4)によるクラスタ命名を検証済み。Obsidian アプリ内 UI(ボタン・設定タブ・ファイル監視)の実機検証は今後行う。
+実データ(`~/.codex/sessions` の rollout と `~/.claude/projects` のセッション)でパース〜類似度(L2/L3)〜クラスタリング〜ノート生成のパイプライン、Ghostty のコマンド付き起動、Ollama によるクラスタ命名、および Obsidian アプリ内 UI(ボタン・設定タブ・ファイル監視)の実機検証を完了済み。

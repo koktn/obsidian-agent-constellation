@@ -3,6 +3,7 @@ import { execFile, spawn } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import type { TerminalKind } from "../settings";
+import { t } from "../i18n";
 
 /**
  * ターミナル起動(設計書 §7)。
@@ -60,9 +61,7 @@ function ghosttyBinary(): string | null {
 
 async function ghosttyFallback(command: string): Promise<void> {
 	await copyToClipboard(command);
-	new Notice(
-		"Ghostty のコマンド付き起動に失敗したため、コマンドをクリップボードにコピーしました。Ghostty に貼り付けて実行してください。"
-	);
+	new Notice(t("notice.ghosttyFallback"));
 	try {
 		await execFileP("open", ["-a", "Ghostty"]);
 	} catch {
@@ -97,9 +96,7 @@ export async function runInTerminal(
 ): Promise<void> {
 	if (process.platform !== "darwin" && kind !== "clipboard") {
 		await copyToClipboard(command);
-		new Notice(
-			"ターミナル起動は macOS のみ対応です。コマンドをクリップボードにコピーしました。"
-		);
+		new Notice(t("notice.macOnly"));
 		return;
 	}
 	switch (kind) {
@@ -109,9 +106,7 @@ export async function runInTerminal(
 			} catch (e) {
 				console.error("[agent-constellation] Terminal.app 起動失敗", e);
 				await copyToClipboard(command);
-				new Notice(
-					"Terminal.app の起動に失敗したため、コマンドをクリップボードにコピーしました。"
-				);
+				new Notice(t("notice.terminalFailed"));
 			}
 			break;
 		case "ghostty":
@@ -119,7 +114,7 @@ export async function runInTerminal(
 			break;
 		case "clipboard":
 			await copyToClipboard(command);
-			new Notice("コマンドをクリップボードにコピーしました。");
+			new Notice(t("notice.copied"));
 			break;
 	}
 }

@@ -9,6 +9,7 @@ import {
 import * as fs from "fs";
 import * as os from "os";
 import { ACSettingTab, ACSettings, DEFAULT_SETTINGS } from "./settings";
+import { t } from "./i18n";
 import { ConstellationEngine } from "./engine";
 import { Ledger } from "./ledger";
 import { expandHome } from "./utils";
@@ -61,13 +62,13 @@ export default class AgentConstellationPlugin extends Plugin {
 
 		this.addCommand({
 			id: "scan-sessions",
-			name: "セッションを取り込む(スキャン)",
+			name: t("cmd.scan"),
 			callback: () => void this.engine.scan(),
 		});
 
 		this.addCommand({
 			id: "rebuild-notes",
-			name: "ノートを全再生成",
+			name: t("cmd.rebuild"),
 			callback: async () => {
 				await this.engine.scan({ rebuildAll: true });
 			},
@@ -75,7 +76,7 @@ export default class AgentConstellationPlugin extends Plugin {
 
 		this.addCommand({
 			id: "resume-current",
-			name: "このセッションを再開",
+			name: t("cmd.resume"),
 			checkCallback: (checking) => {
 				const file = this.app.workspace.getActiveFile();
 				const fm = file ? this.frontmatterOf(file) : null;
@@ -96,13 +97,11 @@ export default class AgentConstellationPlugin extends Plugin {
 
 		this.addCommand({
 			id: "open-setup-guide",
-			name: "セットアップガイドを表示",
+			name: t("cmd.setupGuide"),
 			callback: () => new SetupGuideModal(this.app, this.settings.noteFolder).open(),
 		});
 
-		this.addRibbonIcon("orbit", "Agent Constellation: セッションを取り込む", () =>
-			void this.engine.scan()
-		);
+		this.addRibbonIcon("orbit", t("ribbon.scan"), () => void this.engine.scan());
 
 		// ---------- コードブロックプロセッサ(設計書 §5) ----------
 
@@ -230,7 +229,7 @@ export default class AgentConstellationPlugin extends Plugin {
 		} catch (e) {
 			console.error("[agent-constellation] ボタン処理に失敗", e);
 			new Notice(
-				`Agent Constellation: 処理に失敗しました: ${e instanceof Error ? e.message : String(e)}`,
+				t("notice.buttonFailed", { msg: e instanceof Error ? e.message : String(e) }),
 				8000
 			);
 		} finally {
@@ -251,10 +250,10 @@ export default class AgentConstellationPlugin extends Plugin {
 
 		const container = el.createDiv({ cls: "agent-constellation-resume" });
 		const button = container.createEl("button", {
-			text: "▶ このセッションを再開",
+			text: t("btn.resume"),
 		});
 		button.addEventListener("click", () => {
-			void this.withBusy(button, "⏳ 起動中…", () =>
+			void this.withBusy(button, t("busy.launching"), () =>
 				resumeSession(this.app, this.settings, this.engine, sessionId, cwd, sourceId)
 			);
 		});
@@ -276,28 +275,28 @@ export default class AgentConstellationPlugin extends Plugin {
 		const container = el.createDiv({ cls: "agent-constellation-skill" });
 
 		const promoteBtn = container.createEl("button", {
-			text: "🚀 Codex に渡して Skill 化",
+			text: t("btn.promote"),
 		});
 		promoteBtn.addEventListener("click", () => {
-			void this.withBusy(promoteBtn, "⏳ ブリーフ生成中…", () =>
+			void this.withBusy(promoteBtn, t("busy.generatingBrief"), () =>
 				promoteWithCodex(this.app, this.settings, this.engine, clusterId)
 			);
 		});
 
 		const briefBtn = container.createEl("button", {
-			text: "📄 ブリーフのみ生成",
+			text: t("btn.brief"),
 		});
 		briefBtn.addEventListener("click", () => {
-			void this.withBusy(briefBtn, "⏳ 生成中…", async () => {
+			void this.withBusy(briefBtn, t("busy.generating"), async () => {
 				await generateBrief(this.app, this.settings, this.engine, clusterId);
 			});
 		});
 
 		const doneBtn = container.createEl("button", {
-			text: "✅ promoted にする",
+			text: t("btn.markPromoted"),
 		});
 		doneBtn.addEventListener("click", () => {
-			void this.withBusy(doneBtn, "⏳ 更新中…", () =>
+			void this.withBusy(doneBtn, t("busy.updating"), () =>
 				markPromoted(this.engine, clusterId)
 			);
 		});
@@ -315,34 +314,20 @@ class SetupGuideModal extends Modal {
 
 	onOpen(): void {
 		const { contentEl } = this;
-		contentEl.createEl("h2", { text: "Agent Constellation セットアップガイド" });
+		const folder = this.noteFolder;
+		contentEl.createEl("h2", { text: t("setup.title") });
 
-		contentEl.createEl("p", {
-			text:
-				"コマンドパレットの「セッションを取り込む(スキャン)」で Codex CLI / Claude Code のセッションが " +
-				`${this.noteFolder}/ 配下のノートになります。`,
-		});
+		contentEl.createEl("p", { text: t("setup.intro", { folder }) });
 
-		contentEl.createEl("h3", { text: "Graph View の推奨設定" });
+		contentEl.createEl("h3", { text: t("setup.graphHeading") });
 		const ul = contentEl.createEl("ul");
-		ul.createEl("li", {
-			text: `フィルタ: path:${this.noteFolder} (星座だけを表示したい場合)`,
-		});
-		ul.createEl("li", { text: "グループ: tag:#agent-session → 灰色" });
-		ul.createEl("li", {
-			text: `グループ: path:${this.noteFolder}/clusters → 青(クラスタハブ)`,
-		});
-		ul.createEl("li", {
-			text: "グループ: tag:#skill-candidate → 黄(Skill 候補が光る)",
-		});
+		ul.createEl("li", { text: t("setup.graphFilter", { folder }) });
+		ul.createEl("li", { text: t("setup.graphGroupSession") });
+		ul.createEl("li", { text: t("setup.graphGroupCluster", { folder }) });
+		ul.createEl("li", { text: t("setup.graphGroupCandidate") });
 
-		contentEl.createEl("h3", { text: "フォルダが邪魔な場合" });
-		contentEl.createEl("p", {
-			text:
-				"設定 → ファイルとリンク → 除外ファイル(Excluded files)に " +
-				`${this.noteFolder} を追加すると、検索やクイックスイッチャーから除外できます` +
-				"(Graph View には表示されたままになります)。",
-		});
+		contentEl.createEl("h3", { text: t("setup.excludeHeading") });
+		contentEl.createEl("p", { text: t("setup.excludeBody", { folder }) });
 	}
 
 	onClose(): void {

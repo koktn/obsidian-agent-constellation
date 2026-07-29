@@ -3,7 +3,8 @@
 	"name": "Agent Constellation",
 	"version": "0.1.0",
 	"minAppVersion": "1.5.0",
-	"description": "Codex CLI / Claude Code のセッション履歴をノート化し、Graph View で星座のように俯瞰・resume・Skill 化する(macOS デスクトップ専用・Node API 使用・テレメトリなし)",
+	"description": "Import Codex CLI and Claude Code session history as notes, explore them like constellations in the graph view, resume past sessions, and turn repeated patterns into skills. macOS only.",
 	"author": "koktn",
+	"authorUrl": "https://github.com/koktn",
 	"isDesktopOnly": true
 }
