@@ -212,6 +212,33 @@ export default class AgentConstellationPlugin extends Plugin {
 		return params;
 	}
 
+	/**
+	 * ボタン共通ラッパ: 処理中表示・連打防止・エラー通知。
+	 * 処理の成否がボタンの見た目とNoticeで分かるようにする。
+	 */
+	private async withBusy(
+		button: HTMLButtonElement,
+		busyText: string,
+		fn: () => Promise<void>
+	): Promise<void> {
+		if (button.disabled) return;
+		const original = button.textContent;
+		button.disabled = true;
+		button.textContent = busyText;
+		try {
+			await fn();
+		} catch (e) {
+			console.error("[agent-constellation] ボタン処理に失敗", e);
+			new Notice(
+				`Agent Constellation: 処理に失敗しました: ${e instanceof Error ? e.message : String(e)}`,
+				8000
+			);
+		} finally {
+			button.disabled = false;
+			button.textContent = original;
+		}
+	}
+
 	private renderResumeBlock(
 		source: string,
 		el: HTMLElement,
@@ -227,7 +254,9 @@ export default class AgentConstellationPlugin extends Plugin {
 			text: "▶ このセッションを再開",
 		});
 		button.addEventListener("click", () => {
-			void resumeSession(this.app, this.settings, this.engine, sessionId, cwd, sourceId);
+			void this.withBusy(button, "⏳ 起動中…", () =>
+				resumeSession(this.app, this.settings, this.engine, sessionId, cwd, sourceId)
+			);
 		});
 		if (cwd) {
 			container.createEl("span", {
@@ -250,21 +279,27 @@ export default class AgentConstellationPlugin extends Plugin {
 			text: "🚀 Codex に渡して Skill 化",
 		});
 		promoteBtn.addEventListener("click", () => {
-			void promoteWithCodex(this.app, this.settings, this.engine, clusterId);
+			void this.withBusy(promoteBtn, "⏳ ブリーフ生成中…", () =>
+				promoteWithCodex(this.app, this.settings, this.engine, clusterId)
+			);
 		});
 
 		const briefBtn = container.createEl("button", {
 			text: "📄 ブリーフのみ生成",
 		});
 		briefBtn.addEventListener("click", () => {
-			void generateBrief(this.app, this.settings, this.engine, clusterId);
+			void this.withBusy(briefBtn, "⏳ 生成中…", async () => {
+				await generateBrief(this.app, this.settings, this.engine, clusterId);
+			});
 		});
 
 		const doneBtn = container.createEl("button", {
 			text: "✅ promoted にする",
 		});
 		doneBtn.addEventListener("click", () => {
-			void markPromoted(this.engine, clusterId);
+			void this.withBusy(doneBtn, "⏳ 更新中…", () =>
+				markPromoted(this.engine, clusterId)
+			);
 		});
 	}
 }

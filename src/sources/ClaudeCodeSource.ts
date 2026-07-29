@@ -58,7 +58,7 @@ export class ClaudeCodeSource implements SessionSource {
 	}
 
 	buildResumeCommand(sessionId: string, cwd: string | null): string {
-		const resume = `claude --resume ${sessionId}`;
+		const resume = `claude --resume ${shellQuote(sessionId)}`;
 		return cwd ? `cd ${shellQuote(cwd)} && ${resume}` : resume;
 	}
 }

@@ -1,4 +1,4 @@
-import { App, Notice, normalizePath } from "obsidian";
+import { App, Notice, TFile, normalizePath } from "obsidian";
 import * as os from "os";
 import type { ACSettings } from "./settings";
 import type {
@@ -86,11 +86,22 @@ export class ConstellationEngine {
 	async scan(opts: { silent?: boolean; rebuildAll?: boolean } = {}): Promise<void> {
 		if (this.scanning) return;
 		this.scanning = true;
+		// 失敗時に台帳を巻き戻すためのスナップショット。
+		// 途中まで更新した台帳が残ると、次回スキャンで「変更なし」と誤判定され
+		// ノートが永久に書かれないため、失敗時は必ず元に戻す。
+		const snapshot = JSON.stringify(this.ledger.data);
 		try {
 			await this.scanInner(opts);
 		} catch (e) {
+			try {
+				this.ledger.data = JSON.parse(snapshot);
+			} catch {
+				// スナップショット復元に失敗しても続行(次回 rebuildAll で回復可能)
+			}
 			console.error("[agent-constellation] スキャン失敗", e);
-			new Notice("Agent Constellation: スキャンに失敗しました。詳細はコンソールを確認してください。");
+			new Notice(
+				`Agent Constellation: スキャンに失敗しました(台帳は巻き戻しました): ${e instanceof Error ? e.message : String(e)}`
+			);
 		} finally {
 			this.scanning = false;
 		}
@@ -466,12 +477,26 @@ export class ConstellationEngine {
 		return fallback;
 	}
 
+	/** 単一クラスタのハブノートだけを書き直す(promoted 更新用。全再計算はしない) */
+	async writeClusterNote(clusterId: string): Promise<void> {
+		const cluster = this.ledger.data.clusters[clusterId];
+		if (!cluster) return;
+		const sessions = cluster.members
+			.map((m) => this.ledger.data.sessions[m])
+			.filter((x): x is StoredSession => !!x);
+		const pattern = await this.clusterPattern(sessions);
+		await this.writeGeneratedNote(
+			cluster.notePath,
+			renderClusterNote(cluster, sessions, pattern)
+		);
+	}
+
 	async ensureFolder(folder: string): Promise<void> {
 		const parts = normalizePath(folder).split("/");
 		let cur = "";
 		for (const p of parts) {
 			cur = cur ? `${cur}/${p}` : p;
-			if (!(await this.app.vault.adapter.exists(cur))) {
+			if (!this.app.vault.getAbstractFileByPath(cur)) {
 				try {
 					await this.app.vault.createFolder(cur);
 				} catch {
@@ -481,28 +506,32 @@ export class ConstellationEngine {
 		}
 	}
 
-	/** generated: true のノートだけを上書きする(設計書 §5.1) */
+	/**
+	 * generated: true のノートだけを上書きする(設計書 §5.1)。
+	 * adapter 直書きだと Obsidian の索引(metadataCache)と実ファイルがずれるため、
+	 * 必ず Vault API(create/modify)経由で書く。
+	 */
 	async writeGeneratedNote(path: string, content: string): Promise<void> {
-		const adapter = this.app.vault.adapter;
-		if (await adapter.exists(path)) {
-			const existing = await adapter.read(path);
-			if (!GENERATED_RE.test(existing)) return; // ユーザーが管理下に置いたノート
-			if (existing === content) return;
+		const normalized = normalizePath(path);
+		const existing = this.app.vault.getAbstractFileByPath(normalized);
+		if (existing instanceof TFile) {
+			const current = await this.app.vault.read(existing);
+			if (!GENERATED_RE.test(current)) return; // ユーザーが管理下に置いたノート
+			if (current === content) return;
+			await this.app.vault.modify(existing, content);
+			return;
 		}
-		await adapter.write(path, content);
+		if (existing) return; // 同名のフォルダ等がある場合は触らない
+		await this.app.vault.create(normalized, content);
 	}
 
 	private async removeGeneratedNote(path: string): Promise<void> {
-		const adapter = this.app.vault.adapter;
 		try {
-			if (!(await adapter.exists(path))) return;
-			const existing = await adapter.read(path);
+			const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
+			if (!(file instanceof TFile)) return;
+			const existing = await this.app.vault.read(file);
 			if (!GENERATED_RE.test(existing)) return;
-			if (typeof adapter.trashLocal === "function") {
-				await adapter.trashLocal(path);
-			} else {
-				await adapter.remove(path);
-			}
+			await this.app.fileManager.trashFile(file);
 		} catch (e) {
 			console.error(`[agent-constellation] ノート削除に失敗: ${path}`, e);
 		}

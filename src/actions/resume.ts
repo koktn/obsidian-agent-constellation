@@ -41,7 +41,7 @@ export async function resumeSession(
 		new MissingCwdModal(app, effectiveCwd, async (choice) => {
 			if (choice === "home") {
 				const homeCmd = engine.buildResumeCommand(source, sessionId, os.homedir());
-				await runInTerminal(settings.terminal, homeCmd);
+				await runInTerminal(settings.terminal, homeCmd, os.homedir());
 			} else if (choice === "copy") {
 				await navigator.clipboard.writeText(command);
 				new Notice("コマンドをクリップボードにコピーしました。");
@@ -50,7 +50,7 @@ export async function resumeSession(
 		return;
 	}
 
-	await runInTerminal(settings.terminal, command);
+	await runInTerminal(settings.terminal, command, effectiveCwd);
 }
 
 type MissingCwdChoice = "home" | "copy" | "cancel";

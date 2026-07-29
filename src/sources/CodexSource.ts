@@ -56,7 +56,7 @@ export class CodexSource implements SessionSource {
 	}
 
 	buildResumeCommand(sessionId: string, cwd: string | null): string {
-		const resume = `codex resume ${sessionId}`;
+		const resume = `codex resume ${shellQuote(sessionId)}`;
 		return cwd ? `cd ${shellQuote(cwd)} && ${resume}` : resume;
 	}
 }

@@ -1,4 +1,4 @@
-import { App, FileSystemAdapter, Notice, normalizePath } from "obsidian";
+import { App, FileSystemAdapter, Notice, TFile, normalizePath } from "obsidian";
 import * as os from "os";
 import * as fs from "fs";
 import type { ACSettings } from "../settings";
@@ -46,8 +46,14 @@ export async function generateBrief(
 	const path = normalizePath(
 		`${folder}/${sanitizeFileName(`brief - ${cluster.name}`)}.md`
 	);
-	await app.vault.adapter.write(path, content);
+	await engine.writeGeneratedNote(path, content);
 	new Notice(`ブリーフを生成しました: ${path}`);
+
+	// 生成したブリーフを新しいタブで開く
+	const file = app.vault.getAbstractFileByPath(path);
+	if (file instanceof TFile) {
+		await app.workspace.getLeaf(true).openFile(file);
+	}
 	return path;
 }
 
@@ -84,7 +90,7 @@ export async function promoteWithCodex(
 		.replace(/\{repo\}/g, repo)
 		.replace(/\{brief\}/g, briefAbs);
 
-	await runInTerminal(settings.terminal, command);
+	await runInTerminal(settings.terminal, command, repo);
 }
 
 /** Skill 完成後、手動で promoted に更新する(設計書 §8) */
@@ -97,8 +103,9 @@ export async function markPromoted(
 		new Notice(`クラスタ ${clusterId} が見つかりません。`);
 		return;
 	}
+	// 全クラスタの再計算はせず、当該クラスタのハブノートだけ書き直す
 	cluster.skillStatus = "promoted";
-	await engine.recomputeAndWrite();
+	await engine.writeClusterNote(clusterId);
 	await engine.ledger.save();
 	new Notice(`クラスタ「${cluster.name}」を promoted にしました。`);
 }

@@ -39,6 +39,24 @@ npm test       # vitest(パーサ・類似度・クラスタリング・ノー�
 npm run build  # 型チェック + 本番ビルド
 ```
 
+## Graph View フィルタ例
+
+グラフビュー右上の歯車 → 検索欄(フィルタ)に入力する。
+
+- `_Constellation` だけの専用表示(星座ビュー):
+
+  ```
+  path:_Constellation
+  ```
+
+- クラスタハブは常に表示しつつ、セッションだけを日付で絞る。セッションノートのファイル名は `YYYY-MM-DD タイトル` で始まるため、`file:` で日付の前方一致ができる:
+
+  ```
+  path:_Constellation/clusters OR (path:_Constellation/sessions file:2026-07)
+  ```
+
+  `file:2026-07` の部分を `file:2026-07-28`(特定日)や `file:2026-`(年単位)に変えて調整できる。
+
 ## ドキュメント
 
 - [設計書(v0.1)](docs/design.md)
