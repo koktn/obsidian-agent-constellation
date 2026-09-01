@@ -73,7 +73,6 @@ interface Acc {
 	endedAt: string | null;
 	cwd: string | null;
 	userMessages: string[];
-	userSeen: Set<string>;
 	lastAssistantMessage: string | null;
 	commands: string[];
 	commandSeen: Set<string>;
@@ -97,8 +96,8 @@ function pushFile(acc: Acc, file: string): void {
 function pushUser(acc: Acc, text: string): void {
 	if (!isRealUserText(text)) return;
 	const t = text.trim();
-	if (acc.userSeen.has(t)) return;
-	acc.userSeen.add(t);
+	// 同じ発話が response_item と event_msg の両方に連続記録される形式だけを除外する。
+	if (acc.userMessages.at(-1) === t) return;
 	acc.userMessages.push(t);
 }
 
@@ -196,7 +195,6 @@ export function parseRollout(content: string, fileName = ""): ParsedSession | nu
 		endedAt: null,
 		cwd: null,
 		userMessages: [],
-		userSeen: new Set(),
 		lastAssistantMessage: null,
 		commands: [],
 		commandSeen: new Set(),

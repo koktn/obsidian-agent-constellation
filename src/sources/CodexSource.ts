@@ -16,6 +16,10 @@ export class CodexSource implements SessionSource {
 
 	constructor(private sessionsDir: () => string) {}
 
+	rootAvailable(): boolean {
+		return fs.existsSync(this.sessionsDir());
+	}
+
 	async listSessionFiles(): Promise<SessionFileInfo[]> {
 		const root = this.sessionsDir();
 		const result: SessionFileInfo[] = [];

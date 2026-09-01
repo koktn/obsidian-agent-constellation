@@ -1,4 +1,4 @@
-import type { ParsedSession } from "../types";
+import type { ParsedSession, SessionSourceId } from "../types";
 
 export interface SessionFileInfo {
 	/** セッション実体ファイルの絶対パス */
@@ -12,7 +12,9 @@ export interface SessionFileInfo {
  * まず Codex CLI に対応し、将来他のエージェントを追加できるようにする。
  */
 export interface SessionSource {
-	readonly id: string;
+	readonly id: SessionSourceId;
+	/** 設定された履歴ルートが現在アクセス可能か */
+	rootAvailable(): boolean;
 	/** セッションファイルを列挙する */
 	listSessionFiles(): Promise<SessionFileInfo[]>;
 	/** 1ファイルをパースする(解釈不能なら null) */

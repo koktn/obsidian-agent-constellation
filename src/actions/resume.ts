@@ -16,7 +16,7 @@ export async function resumeSession(
 	engine: ConstellationEngine,
 	sessionId: string,
 	cwd: string | null,
-	sourceId: string | null = null
+	sourceId: string | null = null,
 ): Promise<void> {
 	if (!sessionId) {
 		new Notice(t("notice.noSessionId"));
@@ -24,7 +24,7 @@ export async function resumeSession(
 	}
 
 	// セッション実体の存在チェック(同期環境では別マシンに実体がない、設計書 §12)
-	const stored = engine.ledger.data.sessions[sessionId];
+	const stored = engine.findStoredSession(sessionId, sourceId);
 	const sessionFile = stored?.filePath ?? null;
 	if (sessionFile && !fs.existsSync(sessionFile)) {
 		new Notice(t("notice.noSessionFile"), 8000);
@@ -57,7 +57,7 @@ class MissingCwdModal extends Modal {
 	constructor(
 		app: App,
 		private cwd: string,
-		private onChoose: (choice: MissingCwdChoice) => void
+		private onChoose: (choice: MissingCwdChoice) => void,
 	) {
 		super(app);
 	}
@@ -70,24 +70,25 @@ class MissingCwdModal extends Modal {
 		});
 		new Setting(contentEl)
 			.addButton((b) =>
-				b.setButtonText(t("modal.missingCwd.home"))
+				b
+					.setButtonText(t("modal.missingCwd.home"))
 					.setCta()
 					.onClick(() => {
 						this.close();
 						this.onChoose("home");
-					})
+					}),
 			)
 			.addButton((b) =>
 				b.setButtonText(t("modal.missingCwd.copy")).onClick(() => {
 					this.close();
 					this.onChoose("copy");
-				})
+				}),
 			)
 			.addButton((b) =>
 				b.setButtonText(t("modal.missingCwd.cancel")).onClick(() => {
 					this.close();
 					this.onChoose("cancel");
-				})
+				}),
 			);
 	}
 

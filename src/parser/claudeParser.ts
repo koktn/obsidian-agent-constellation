@@ -80,7 +80,7 @@ export function parseClaudeSession(
 	let cwd: string | null = null;
 	let title: string | null = null;
 	let lastAssistantMessage: string | null = null;
-	const users = new CappedSet(Number.MAX_SAFE_INTEGER);
+	const users: string[] = [];
 	const commands = new CappedSet(MAX_COMMANDS);
 	const files = new CappedSet(MAX_FILES);
 
@@ -128,17 +128,18 @@ export function parseClaudeSession(
 					: null;
 			if (originKind && originKind !== "human") continue;
 			const text = userTextOf(message.content);
-			if (isRealUserText(text)) users.push(text);
+			if (isRealUserText(text)) users.push(text.trim());
 			continue;
 		}
 
 		if (type === "assistant" && message && Array.isArray(message.content)) {
+			const assistantTexts: string[] = [];
 			for (const b of message.content) {
 				if (!b || typeof b !== "object") continue;
 				const block = b as { type?: unknown; text?: unknown; name?: unknown; input?: unknown };
 				if (block.type === "text") {
 					const text = asString(block.text)?.trim();
-					if (text) lastAssistantMessage = text;
+					if (text) assistantTexts.push(text);
 				} else if (block.type === "tool_use") {
 					const name = asString(block.name) ?? "";
 					const input =
@@ -152,6 +153,7 @@ export function parseClaudeSession(
 					}
 				}
 			}
+			if (assistantTexts.length > 0) lastAssistantMessage = assistantTexts.join("\n");
 			continue;
 		}
 
@@ -161,7 +163,7 @@ export function parseClaudeSession(
 	sessionId = sessionId ?? claudeSessionIdFromFileName(fileName);
 	if (!sessionId) return null;
 
-	const userMessages = users.values.map((m) =>
+	const userMessages = users.map((m) =>
 		m.length > MAX_TEXT_PER_MESSAGE ? m.slice(0, MAX_TEXT_PER_MESSAGE) : m
 	);
 

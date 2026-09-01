@@ -20,6 +20,8 @@ export interface ParsedSession {
 
 /** 台帳(内部データ層)に保存するセッション情報 */
 export interface StoredSession {
+	/** source と sessionId を組み合わせた台帳内の一意キー */
+	key: string;
 	sessionId: string;
 	source: SessionSourceId;
 	/** rollout JSONL の絶対パス */
@@ -37,7 +39,10 @@ export interface StoredSession {
 	commands: string[];
 	files: string[];
 	turns: number;
+	lastAssistantMessage: string | null;
 	summary: string;
+	/** 同一ログのコピーとみなせる場合の代表セッションキー */
+	duplicateOf?: string;
 	/** Vault 相対のノートパス */
 	notePath: string;
 }
@@ -47,7 +52,14 @@ export type SkillStatus = "none" | "candidate" | "promoted";
 export interface StoredCluster {
 	clusterId: string;
 	name: string;
+	nameLocale?: "en" | "ja";
 	members: string[]; // sessionId
+	/** Skill候補評価期間内の、重複を除いた session key */
+	recentMembers?: string[];
+	/** 0 は全期間 */
+	candidateWindowDays?: number;
+	/** 評価期間内メンバー間の類似リンク密度 (0..1) */
+	candidateDensity?: number;
 	skillStatus: SkillStatus;
 	/** Vault 相対のハブノートパス */
 	notePath: string;
@@ -60,6 +72,9 @@ export interface LedgerData {
 	clusters: Record<string, StoredCluster>; // clusterId -> cluster
 	/** ユーザー発話が無くスキップした rollout(filePath -> mtime/size)。再スキャン時の再処理を防ぐ */
 	skipped: Record<string, { mtime: number; size: number }>;
+	/** 前回計算済みの類似リンク。通常スキャンでは変更セッション分だけ更新する */
+	edges: Edge[];
+	edgeSignature: string;
 }
 
 export interface EmbeddingCache {

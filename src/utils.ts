@@ -9,6 +9,14 @@ export function shellQuote(s: string): string {
 	return `'${s.replace(/'/g, `'\\''`)}'`;
 }
 
+export function fillShellTemplate(template: string, values: Record<string, string>): string {
+	let command = template;
+	for (const [name, value] of Object.entries(values)) {
+		command = command.split(`{${name}}`).join(shellQuote(value));
+	}
+	return command;
+}
+
 /** 依存ゼロの軽量ハッシュ(embedding キャッシュのキー用) */
 export function hashText(text: string): string {
 	let h1 = 5381;
@@ -18,7 +26,7 @@ export function hashText(text: string): string {
 		h1 = (h1 * 33) ^ c;
 		h2 = (h2 * 31) ^ c;
 	}
-	return ((h1 >>> 0).toString(36) + "-" + (h2 >>> 0).toString(36));
+	return (h1 >>> 0).toString(36) + "-" + (h2 >>> 0).toString(36);
 }
 
 export function sleep(ms: number): Promise<void> {

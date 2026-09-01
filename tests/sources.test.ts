@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CodexSource } from "../src/sources/CodexSource";
 import { ClaudeCodeSource } from "../src/sources/ClaudeCodeSource";
-import { shellQuote } from "../src/utils";
+import { fillShellTemplate, shellQuote } from "../src/utils";
 
 describe("shellQuote", () => {
 	it("シングルクォートで包む", () => {
@@ -12,20 +12,31 @@ describe("shellQuote", () => {
 	});
 });
 
+describe("fillShellTemplate", () => {
+	it("Skill化のrepoとbriefをシェルクォートする", () => {
+		expect(
+			fillShellTemplate("cd {repo} && codex {brief}", {
+				repo: "/Users/me/my repo",
+				brief: "/vault/a'; echo unsafe; '.md",
+			}),
+		).toBe("cd '/Users/me/my repo' && codex '/vault/a'\\''; echo unsafe; '\\''.md'");
+	});
+});
+
 describe("buildResumeCommand", () => {
 	const codex = new CodexSource(() => "/tmp");
 	const claude = new ClaudeCodeSource(() => "/tmp");
 
 	it("codex: session id と cwd をシェルクォートする", () => {
-		expect(
-			codex.buildResumeCommand("0198aaaa-bbbb", "/Users/me/dev/my app")
-		).toBe("cd '/Users/me/dev/my app' && codex resume '0198aaaa-bbbb'");
+		expect(codex.buildResumeCommand("0198aaaa-bbbb", "/Users/me/dev/my app")).toBe(
+			"cd '/Users/me/dev/my app' && codex resume '0198aaaa-bbbb'",
+		);
 	});
 
 	it("claude: session id と cwd をシェルクォートする", () => {
-		expect(
-			claude.buildResumeCommand("71aa38e3-e271", "/Users/me/dev/myapp")
-		).toBe("cd '/Users/me/dev/myapp' && claude --resume '71aa38e3-e271'");
+		expect(claude.buildResumeCommand("71aa38e3-e271", "/Users/me/dev/myapp")).toBe(
+			"cd '/Users/me/dev/myapp' && claude --resume '71aa38e3-e271'",
+		);
 	});
 
 	it("cwd 無しでは cd を付けない", () => {

@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	claudeSessionIdFromFileName,
-	parseClaudeSession,
-} from "../src/parser/claudeParser";
+import { claudeSessionIdFromFileName, parseClaudeSession } from "../src/parser/claudeParser";
 
 const SESSION_ID = "71aa38e3-e271-42c5-8a94-197b933dba4f";
 const FILE = `${SESSION_ID}.jsonl`;
@@ -23,7 +20,10 @@ const LINES: unknown[] = [
 	{
 		type: "user",
 		isSidechain: false,
-		message: { role: "user", content: "chromeにアプリをインストールしました。READMEの対応をしてください" },
+		message: {
+			role: "user",
+			content: "chromeにアプリをインストールしました。READMEの対応をしてください",
+		},
 		timestamp: "2026-07-11T23:42:34.966Z",
 		origin: { kind: "human" },
 		cwd: "/Users/me/dev/adapp",
@@ -46,7 +46,11 @@ const LINES: unknown[] = [
 				{
 					type: "tool_use",
 					name: "Edit",
-					input: { file_path: "/Users/me/dev/adapp/src/providers/yahoo.ts", old_string: "a", new_string: "b" },
+					input: {
+						file_path: "/Users/me/dev/adapp/src/providers/yahoo.ts",
+						old_string: "a",
+						new_string: "b",
+					},
 				},
 				{
 					type: "tool_use",
@@ -120,7 +124,12 @@ const LINES: unknown[] = [
 		timestamp: "2026-07-11T23:50:00.000Z",
 		sessionId: SESSION_ID,
 	},
-	{ type: "system", subtype: "turn_duration", durationMs: 1000, timestamp: "2026-07-11T23:50:47.133Z" },
+	{
+		type: "system",
+		subtype: "turn_duration",
+		durationMs: 1000,
+		timestamp: "2026-07-11T23:50:47.133Z",
+	},
 ];
 
 describe("claudeSessionIdFromFileName", () => {
@@ -167,5 +176,32 @@ describe("parseClaudeSession", () => {
 		const t = parseClaudeSession("not json", FILE);
 		expect(t?.sessionId).toBe(SESSION_ID);
 		expect(t?.turns).toBe(0);
+	});
+
+	it("同じ文面の別ターンを保持し、最終回答のtext blockを連結する", () => {
+		const entries = [
+			{ type: "user", sessionId: SESSION_ID, message: { role: "user", content: "もう一度" } },
+			{
+				type: "assistant",
+				sessionId: SESSION_ID,
+				message: { role: "assistant", content: [{ type: "text", text: "前半" }] },
+			},
+			{ type: "user", sessionId: SESSION_ID, message: { role: "user", content: "もう一度" } },
+			{
+				type: "assistant",
+				sessionId: SESSION_ID,
+				message: {
+					role: "assistant",
+					content: [
+						{ type: "text", text: "結果1" },
+						{ type: "text", text: "結果2" },
+					],
+				},
+			},
+		];
+		const parsed = parseClaudeSession(jsonl(entries), FILE)!;
+		expect(parsed.userMessages).toEqual(["もう一度", "もう一度"]);
+		expect(parsed.turns).toBe(2);
+		expect(parsed.lastAssistantMessage).toBe("結果1\n結果2");
 	});
 });

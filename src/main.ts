@@ -1,11 +1,4 @@
-import {
-	App,
-	MarkdownPostProcessorContext,
-	Modal,
-	Notice,
-	Plugin,
-	TFile,
-} from "obsidian";
+import { App, MarkdownPostProcessorContext, Modal, Notice, Plugin, TFile } from "obsidian";
 import * as fs from "fs";
 import * as os from "os";
 import { ACSettingTab, ACSettings, DEFAULT_SETTINGS } from "./settings";
@@ -24,6 +17,7 @@ export default class AgentConstellationPlugin extends Plugin {
 	private watchers: fs.FSWatcher[] = [];
 	private watchDebounce: number | null = null;
 	private autoScanInterval: number | null = null;
+	private recomputeTimer: number | null = null;
 
 	hostname(): string {
 		return os.hostname();
@@ -40,11 +34,7 @@ export default class AgentConstellationPlugin extends Plugin {
 	async onload(): Promise<void> {
 		await this.loadSettings();
 
-		this.ledger = new Ledger(
-			this.app.vault.adapter,
-			this.hostname(),
-			this.app.vault.configDir
-		);
+		this.ledger = new Ledger(this.app.vault.adapter, this.hostname(), this.app.vault.configDir);
 		await this.ledger.load();
 
 		this.engine = new ConstellationEngine(
@@ -53,7 +43,7 @@ export default class AgentConstellationPlugin extends Plugin {
 			this.ledger,
 			() => this.codexSessionsDir(),
 			() => this.claudeSessionsDir(),
-			() => this.saveSettings()
+			() => this.saveSettings(),
 		);
 
 		this.addSettingTab(new ACSettingTab(this.app, this));
@@ -89,7 +79,7 @@ export default class AgentConstellationPlugin extends Plugin {
 					this.engine,
 					sessionId,
 					typeof fm?.cwd === "string" ? fm.cwd : null,
-					typeof fm?.source === "string" ? fm.source : null
+					typeof fm?.source === "string" ? fm.source : null,
 				);
 				return true;
 			},
@@ -101,15 +91,21 @@ export default class AgentConstellationPlugin extends Plugin {
 			callback: () => new SetupGuideModal(this.app, this.settings.noteFolder).open(),
 		});
 
+		this.addCommand({
+			id: "audit-generated-notes",
+			name: t("cmd.auditNotes"),
+			callback: () => void this.engine.auditGeneratedNotes(),
+		});
+
 		this.addRibbonIcon("orbit", t("ribbon.scan"), () => void this.engine.scan());
 
 		// ---------- コードブロックプロセッサ(設計書 §5) ----------
 
 		this.registerMarkdownCodeBlockProcessor("resume", (source, el, ctx) =>
-			this.renderResumeBlock(source, el, ctx)
+			this.renderResumeBlock(source, el, ctx),
 		);
 		this.registerMarkdownCodeBlockProcessor("skill-promote", (source, el, ctx) =>
-			this.renderSkillPromoteBlock(source, el, ctx)
+			this.renderSkillPromoteBlock(source, el, ctx),
 		);
 
 		// ---------- 自動処理 ----------
@@ -130,6 +126,16 @@ export default class AgentConstellationPlugin extends Plugin {
 
 	onunload(): void {
 		this.stopWatcher();
+		if (this.recomputeTimer !== null) window.clearTimeout(this.recomputeTimer);
+	}
+
+	/** 設定入力中の連続再計算をまとめる。 */
+	requestRecompute(): void {
+		if (this.recomputeTimer !== null) window.clearTimeout(this.recomputeTimer);
+		this.recomputeTimer = window.setTimeout(() => {
+			this.recomputeTimer = null;
+			void this.engine.recompute();
+		}, 800);
 	}
 
 	// ---------- 設定 ----------
@@ -153,7 +159,7 @@ export default class AgentConstellationPlugin extends Plugin {
 		if (min > 0) {
 			this.autoScanInterval = window.setInterval(
 				() => void this.engine.scan({ silent: true }),
-				min * 60_000
+				min * 60_000,
 			);
 			this.registerInterval(this.autoScanInterval);
 		}
@@ -170,7 +176,7 @@ export default class AgentConstellationPlugin extends Plugin {
 					if (this.watchDebounce !== null) window.clearTimeout(this.watchDebounce);
 					this.watchDebounce = window.setTimeout(
 						() => void this.engine.scan({ silent: true }),
-						5_000
+						5_000,
 					);
 				});
 				this.watchers.push(watcher);
@@ -218,7 +224,7 @@ export default class AgentConstellationPlugin extends Plugin {
 	private async withBusy(
 		button: HTMLButtonElement,
 		busyText: string,
-		fn: () => Promise<void>
+		fn: () => Promise<void>,
 	): Promise<void> {
 		if (button.disabled) return;
 		const original = button.textContent;
@@ -230,7 +236,7 @@ export default class AgentConstellationPlugin extends Plugin {
 			console.error("[agent-constellation] ボタン処理に失敗", e);
 			new Notice(
 				t("notice.buttonFailed", { msg: e instanceof Error ? e.message : String(e) }),
-				8000
+				8000,
 			);
 		} finally {
 			button.disabled = false;
@@ -241,7 +247,7 @@ export default class AgentConstellationPlugin extends Plugin {
 	private renderResumeBlock(
 		source: string,
 		el: HTMLElement,
-		_ctx: MarkdownPostProcessorContext
+		_ctx: MarkdownPostProcessorContext,
 	): void {
 		const params = this.parseBlockParams(source);
 		const sessionId = params["session_id"] ?? "";
@@ -254,7 +260,7 @@ export default class AgentConstellationPlugin extends Plugin {
 		});
 		button.addEventListener("click", () => {
 			void this.withBusy(button, t("busy.launching"), () =>
-				resumeSession(this.app, this.settings, this.engine, sessionId, cwd, sourceId)
+				resumeSession(this.app, this.settings, this.engine, sessionId, cwd, sourceId),
 			);
 		});
 		if (cwd) {
@@ -268,7 +274,7 @@ export default class AgentConstellationPlugin extends Plugin {
 	private renderSkillPromoteBlock(
 		source: string,
 		el: HTMLElement,
-		_ctx: MarkdownPostProcessorContext
+		_ctx: MarkdownPostProcessorContext,
 	): void {
 		const params = this.parseBlockParams(source);
 		const clusterId = params["cluster_id"] ?? "";
@@ -279,7 +285,7 @@ export default class AgentConstellationPlugin extends Plugin {
 		});
 		promoteBtn.addEventListener("click", () => {
 			void this.withBusy(promoteBtn, t("busy.generatingBrief"), () =>
-				promoteWithCodex(this.app, this.settings, this.engine, clusterId)
+				promoteWithCodex(this.app, this.settings, this.engine, clusterId),
 			);
 		});
 
@@ -297,7 +303,7 @@ export default class AgentConstellationPlugin extends Plugin {
 		});
 		doneBtn.addEventListener("click", () => {
 			void this.withBusy(doneBtn, t("busy.updating"), () =>
-				markPromoted(this.engine, clusterId)
+				markPromoted(this.engine, clusterId),
 			);
 		});
 	}
@@ -307,7 +313,7 @@ export default class AgentConstellationPlugin extends Plugin {
 class SetupGuideModal extends Modal {
 	constructor(
 		app: App,
-		private noteFolder: string
+		private noteFolder: string,
 	) {
 		super(app);
 	}

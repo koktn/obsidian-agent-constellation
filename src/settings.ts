@@ -4,6 +4,7 @@ import { t } from "./i18n";
 
 export type TerminalKind = "terminal" | "ghostty" | "clipboard";
 export type SimilarityLevel = "l2" | "l3";
+export type OutputLanguage = "auto" | "en" | "ja";
 
 export interface ACSettings {
 	noteFolder: string;
@@ -15,11 +16,16 @@ export interface ACSettings {
 	similarityLevel: SimilarityLevel;
 	ollamaEndpoint: string;
 	ollamaEmbedModel: string;
+	ollamaSummariesEnabled: boolean;
 	ollamaChatModel: string;
 	linkThreshold: number;
 	maxLinksPerNote: number;
 	maxClusterSize: number;
 	skillCandidateThreshold: number;
+	/** Skill候補の評価期間(日)。0 は全期間 */
+	skillCandidateLookbackDays: number;
+	/** 生成ノート・ブリーフの言語 */
+	outputLanguage: OutputLanguage;
 	terminal: TerminalKind;
 	skillCommandTemplate: string;
 	/** 取り込み担当マシン(空 = 初回取り込み時に自動設定) */
@@ -36,14 +42,17 @@ export const DEFAULT_SETTINGS: ACSettings = {
 	similarityLevel: "l2",
 	ollamaEndpoint: "http://localhost:11434",
 	ollamaEmbedModel: "bge-m3",
+	ollamaSummariesEnabled: false,
 	ollamaChatModel: "gemma4:e4b-mlx",
 	linkThreshold: 0.35,
 	maxLinksPerNote: 5,
 	maxClusterSize: 40,
 	skillCandidateThreshold: 5,
+	skillCandidateLookbackDays: 30,
+	outputLanguage: "auto",
 	terminal: "terminal",
 	skillCommandTemplate:
-		'cd {repo} && codex "skill-creator を使って、次のファイルにまとめた繰り返しパターンを skill 化して: {brief}"',
+		'cd {repo} && codex "Use skill-creator to turn the repeated pattern summarized in this file into a skill: {brief}"',
 	importHostname: "",
 	setupShown: false,
 };
@@ -69,12 +78,30 @@ export class ACSettingTab extends PluginSettingTab {
 			.setName(t("settings.noteFolder.name"))
 			.setDesc(t("settings.noteFolder.desc"))
 			.addText((tx) =>
-				tx.setPlaceholder(DEFAULT_SETTINGS.noteFolder)
+				tx
+					.setPlaceholder(DEFAULT_SETTINGS.noteFolder)
 					.setValue(s.noteFolder)
 					.onChange(async (v) => {
 						s.noteFolder = v.trim() || DEFAULT_SETTINGS.noteFolder;
 						await save();
-					})
+						this.plugin.requestRecompute();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName(t("settings.outputLanguage.name"))
+			.setDesc(t("settings.outputLanguage.desc"))
+			.addDropdown((d) =>
+				d
+					.addOption("auto", t("settings.outputLanguage.auto"))
+					.addOption("en", t("settings.outputLanguage.en"))
+					.addOption("ja", t("settings.outputLanguage.ja"))
+					.setValue(s.outputLanguage)
+					.onChange(async (v) => {
+						s.outputLanguage = v === "en" ? "en" : v === "ja" ? "ja" : "auto";
+						await save();
+						this.plugin.requestRecompute();
+					}),
 			);
 
 		new Setting(containerEl).setName(t("settings.heading.import")).setHeading();
@@ -83,24 +110,28 @@ export class ACSettingTab extends PluginSettingTab {
 			.setName(t("settings.codexDir.name"))
 			.setDesc(t("settings.codexDir.desc"))
 			.addText((tx) =>
-				tx.setPlaceholder(DEFAULT_SETTINGS.codexSessionsDir)
+				tx
+					.setPlaceholder(DEFAULT_SETTINGS.codexSessionsDir)
 					.setValue(s.codexSessionsDir)
 					.onChange(async (v) => {
 						s.codexSessionsDir = v.trim() || DEFAULT_SETTINGS.codexSessionsDir;
 						await save();
-					})
+						this.plugin.restartWatcher();
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName(t("settings.claudeDir.name"))
 			.setDesc(t("settings.claudeDir.desc"))
 			.addText((tx) =>
-				tx.setPlaceholder(DEFAULT_SETTINGS.claudeSessionsDir)
+				tx
+					.setPlaceholder(DEFAULT_SETTINGS.claudeSessionsDir)
 					.setValue(s.claudeSessionsDir)
 					.onChange(async (v) => {
 						s.claudeSessionsDir = v.trim() || DEFAULT_SETTINGS.claudeSessionsDir;
 						await save();
-					})
+						this.plugin.restartWatcher();
+					}),
 			);
 
 		new Setting(containerEl)
@@ -112,7 +143,7 @@ export class ACSettingTab extends PluginSettingTab {
 					s.autoScanIntervalMin = Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
 					await save();
 					this.plugin.restartAutoScan();
-				})
+				}),
 			);
 
 		new Setting(containerEl)
@@ -123,28 +154,30 @@ export class ACSettingTab extends PluginSettingTab {
 					s.watchEnabled = v;
 					await save();
 					this.plugin.restartWatcher();
-				})
+				}),
 			);
 
 		new Setting(containerEl)
 			.setName(t("settings.importHost.name"))
 			.setDesc(t("settings.importHost.desc"))
 			.addText((tx) =>
-				tx.setPlaceholder(t("settings.importHost.placeholder"))
+				tx
+					.setPlaceholder(t("settings.importHost.placeholder"))
 					.setValue(s.importHostname)
 					.onChange(async (v) => {
 						s.importHostname = v.trim();
 						await save();
-					})
+					}),
 			)
 			.addExtraButton((b) =>
-				b.setIcon("laptop")
+				b
+					.setIcon("laptop")
 					.setTooltip(t("settings.importHost.useThis"))
 					.onClick(async () => {
 						s.importHostname = this.plugin.hostname();
 						await save();
 						this.display();
-					})
+					}),
 			);
 
 		new Setting(containerEl).setName(t("settings.heading.similarity")).setHeading();
@@ -153,48 +186,65 @@ export class ACSettingTab extends PluginSettingTab {
 			.setName(t("settings.simLevel.name"))
 			.setDesc(t("settings.simLevel.desc"))
 			.addDropdown((d) =>
-				d.addOption("l2", t("settings.simLevel.l2"))
+				d
+					.addOption("l2", t("settings.simLevel.l2"))
 					.addOption("l3", t("settings.simLevel.l3"))
 					.setValue(s.similarityLevel)
 					.onChange(async (v) => {
 						s.similarityLevel = v === "l3" ? "l3" : "l2";
 						await save();
-					})
+						this.plugin.requestRecompute();
+					}),
 			);
 
-		new Setting(containerEl)
-			.setName(t("settings.ollamaEndpoint.name"))
-			.addText((tx) =>
-				tx.setPlaceholder(DEFAULT_SETTINGS.ollamaEndpoint)
-					.setValue(s.ollamaEndpoint)
-					.onChange(async (v) => {
-						s.ollamaEndpoint = v.trim() || DEFAULT_SETTINGS.ollamaEndpoint;
-						await save();
-					})
-			);
+		new Setting(containerEl).setName(t("settings.ollamaEndpoint.name")).addText((tx) =>
+			tx
+				.setPlaceholder(DEFAULT_SETTINGS.ollamaEndpoint)
+				.setValue(s.ollamaEndpoint)
+				.onChange(async (v) => {
+					s.ollamaEndpoint = v.trim() || DEFAULT_SETTINGS.ollamaEndpoint;
+					await save();
+					this.plugin.requestRecompute();
+				}),
+		);
 
 		new Setting(containerEl)
 			.setName(t("settings.ollamaEmbed.name"))
 			.setDesc(t("settings.ollamaEmbed.desc"))
 			.addText((tx) =>
-				tx.setPlaceholder(DEFAULT_SETTINGS.ollamaEmbedModel)
+				tx
+					.setPlaceholder(DEFAULT_SETTINGS.ollamaEmbedModel)
 					.setValue(s.ollamaEmbedModel)
 					.onChange(async (v) => {
 						s.ollamaEmbedModel = v.trim() || DEFAULT_SETTINGS.ollamaEmbedModel;
 						await save();
-					})
+						this.plugin.requestRecompute();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName(t("settings.ollamaSummaries.name"))
+			.setDesc(t("settings.ollamaSummaries.desc"))
+			.addToggle((toggle) =>
+				toggle.setValue(s.ollamaSummariesEnabled).onChange(async (value) => {
+					s.ollamaSummariesEnabled = value;
+					await save();
+					this.plugin.requestRecompute();
+				}),
 			);
 
 		new Setting(containerEl)
 			.setName(t("settings.ollamaChat.name"))
 			.setDesc(t("settings.ollamaChat.desc"))
 			.addText((tx) =>
-				tx.setPlaceholder(DEFAULT_SETTINGS.ollamaChatModel)
+				tx
+					.setPlaceholder(DEFAULT_SETTINGS.ollamaChatModel)
 					.setValue(s.ollamaChatModel)
 					.onChange(async (v) => {
 						s.ollamaChatModel = v.trim() || DEFAULT_SETTINGS.ollamaChatModel;
 						await save();
-					})
+						this.plugin.requestRecompute();
+					}),
 			);
 
 		new Setting(containerEl)
@@ -206,8 +256,9 @@ export class ACSettingTab extends PluginSettingTab {
 					if (Number.isFinite(n) && n > 0 && n <= 1) {
 						s.linkThreshold = n;
 						await save();
+						this.plugin.requestRecompute();
 					}
-				})
+				}),
 			);
 
 		new Setting(containerEl)
@@ -219,8 +270,23 @@ export class ACSettingTab extends PluginSettingTab {
 					if (Number.isFinite(n) && n >= 2) {
 						s.skillCandidateThreshold = Math.floor(n);
 						await save();
+						this.plugin.requestRecompute();
 					}
-				})
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName(t("settings.skillLookback.name"))
+			.setDesc(t("settings.skillLookback.desc"))
+			.addText((tx) =>
+				tx.setValue(String(s.skillCandidateLookbackDays)).onChange(async (v) => {
+					const n = Number(v);
+					if (Number.isFinite(n) && n >= 0) {
+						s.skillCandidateLookbackDays = Math.floor(n);
+						await save();
+						this.plugin.requestRecompute();
+					}
+				}),
 			);
 
 		new Setting(containerEl).setName(t("settings.heading.actions")).setHeading();
@@ -229,15 +295,20 @@ export class ACSettingTab extends PluginSettingTab {
 			.setName(t("settings.terminal.name"))
 			.setDesc(t("settings.terminal.desc"))
 			.addDropdown((d) =>
-				d.addOption("terminal", t("settings.terminal.terminalApp"))
+				d
+					.addOption("terminal", t("settings.terminal.terminalApp"))
 					.addOption("ghostty", t("settings.terminal.ghostty"))
 					.addOption("clipboard", t("settings.terminal.clipboard"))
 					.setValue(s.terminal)
 					.onChange(async (v) => {
 						s.terminal =
-							v === "ghostty" ? "ghostty" : v === "clipboard" ? "clipboard" : "terminal";
+							v === "ghostty"
+								? "ghostty"
+								: v === "clipboard"
+									? "clipboard"
+									: "terminal";
 						await save();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
@@ -247,7 +318,7 @@ export class ACSettingTab extends PluginSettingTab {
 				tx.setValue(s.skillCommandTemplate).onChange(async (v) => {
 					s.skillCommandTemplate = v.trim() || DEFAULT_SETTINGS.skillCommandTemplate;
 					await save();
-				})
+				}),
 			);
 	}
 }

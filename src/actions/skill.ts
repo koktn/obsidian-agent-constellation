@@ -7,6 +7,7 @@ import type { StoredCluster, StoredSession } from "../types";
 import { renderBrief, sanitizeFileName } from "../noteRenderer";
 import { runInTerminal } from "./terminal";
 import { t } from "../i18n";
+import { fillShellTemplate } from "../utils";
 
 /**
  * Skill 化フロー(設計書 §8)。
@@ -16,14 +17,18 @@ import { t } from "../i18n";
 
 function getCluster(
 	engine: ConstellationEngine,
-	clusterId: string
+	clusterId: string,
 ): { cluster: StoredCluster; sessions: StoredSession[] } | null {
 	const cluster = engine.ledger.data.clusters[clusterId];
 	if (!cluster) {
 		new Notice(t("notice.clusterNotFoundRescan", { id: clusterId }));
 		return null;
 	}
-	const sessions = cluster.members
+	const selectedMembers =
+		cluster.recentMembers && cluster.recentMembers.length > 0
+			? cluster.recentMembers
+			: cluster.members;
+	const sessions = selectedMembers
 		.map((m) => engine.ledger.data.sessions[m])
 		.filter((s): s is StoredSession => !!s);
 	return { cluster, sessions };
@@ -34,19 +39,17 @@ export async function generateBrief(
 	app: App,
 	settings: ACSettings,
 	engine: ConstellationEngine,
-	clusterId: string
+	clusterId: string,
 ): Promise<string | null> {
 	const found = getCluster(engine, clusterId);
 	if (!found) return null;
 	const { cluster, sessions } = found;
 
 	const pattern = await engine.clusterPattern(sessions);
-	const content = renderBrief(cluster, sessions, pattern);
+	const content = renderBrief(cluster, sessions, pattern, engine.outputLocale());
 	const folder = `${settings.noteFolder}/skills`;
 	await engine.ensureFolder(folder);
-	const path = normalizePath(
-		`${folder}/${sanitizeFileName(`brief - ${cluster.name}`)}.md`
-	);
+	const path = normalizePath(`${folder}/${sanitizeFileName(`brief - ${cluster.name}`)}.md`);
 	await engine.writeGeneratedNote(path, content);
 	new Notice(t("notice.briefCreated", { path }));
 
@@ -63,7 +66,7 @@ export async function promoteWithCodex(
 	app: App,
 	settings: ACSettings,
 	engine: ConstellationEngine,
-	clusterId: string
+	clusterId: string,
 ): Promise<void> {
 	const found = getCluster(engine, clusterId);
 	if (!found) return;
@@ -87,18 +90,16 @@ export async function promoteWithCodex(
 			.map(([dir]) => dir)
 			.find((dir) => fs.existsSync(dir)) ?? os.homedir();
 
-	const command = settings.skillCommandTemplate
-		.replace(/\{repo\}/g, repo)
-		.replace(/\{brief\}/g, briefAbs);
+	const command = fillShellTemplate(settings.skillCommandTemplate, {
+		repo,
+		brief: briefAbs,
+	});
 
 	await runInTerminal(settings.terminal, command, repo);
 }
 
 /** Skill 完成後、手動で promoted に更新する(設計書 §8) */
-export async function markPromoted(
-	engine: ConstellationEngine,
-	clusterId: string
-): Promise<void> {
+export async function markPromoted(engine: ConstellationEngine, clusterId: string): Promise<void> {
 	const cluster = engine.ledger.data.clusters[clusterId];
 	if (!cluster) {
 		new Notice(t("notice.clusterNotFound", { id: clusterId }));

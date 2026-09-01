@@ -5,7 +5,7 @@
  * 生成ノートの本文は設計方針(日本語前提)のまま変更しない。
  */
 
-type Locale = "en" | "ja";
+export type Locale = "en" | "ja";
 
 function detectLocale(): Locale {
 	try {
@@ -18,6 +18,10 @@ function detectLocale(): Locale {
 	return "en";
 }
 
+export function currentLocale(): Locale {
+	return locale ?? detectLocale();
+}
+
 const STRINGS = {
 	// コマンド・リボン
 	"cmd.scan": {
@@ -27,6 +31,7 @@ const STRINGS = {
 	"cmd.rebuild": { en: "Rebuild all notes", ja: "ノートを全再生成" },
 	"cmd.resume": { en: "Resume this session", ja: "このセッションを再開" },
 	"cmd.setupGuide": { en: "Show setup guide", ja: "セットアップガイドを表示" },
+	"cmd.auditNotes": { en: "Audit and repair generated notes", ja: "生成ノートを監査・修復" },
 	"ribbon.scan": {
 		en: "Agent Constellation: Import sessions",
 		ja: "Agent Constellation: セッションを取り込む",
@@ -77,6 +82,10 @@ const STRINGS = {
 	"notice.ollamaFallback": {
 		en: "Agent Constellation: cannot reach Ollama; falling back to TF-IDF (L2).",
 		ja: "Agent Constellation: Ollama に接続できないため、TF-IDF(L2)で計算します。",
+	},
+	"notice.auditComplete": {
+		en: "Agent Constellation: removed {removed} duplicate notes; found {orphans} untracked notes (left unchanged).",
+		ja: "Agent Constellation: 重複ノートを {removed} 件整理しました。未追跡ノート {orphans} 件は変更していません。",
 	},
 
 	// Resume
@@ -184,6 +193,17 @@ const STRINGS = {
 		en: "Folder in the vault for session and cluster notes",
 		ja: "セッションノート・クラスタノートを置く Vault 内フォルダ",
 	},
+	"settings.outputLanguage.name": { en: "Generated note language", ja: "生成ノートの言語" },
+	"settings.outputLanguage.desc": {
+		en: "Language used for generated session notes, cluster notes, and skill briefs",
+		ja: "生成するセッションノート・クラスタノート・Skillブリーフに使う言語",
+	},
+	"settings.outputLanguage.auto": {
+		en: "Follow Obsidian language",
+		ja: "Obsidianの表示言語に従う",
+	},
+	"settings.outputLanguage.en": { en: "English", ja: "英語" },
+	"settings.outputLanguage.ja": { en: "Japanese", ja: "日本語" },
 	"settings.heading.import": { en: "Import", ja: "取り込み" },
 	"settings.codexDir.name": {
 		en: "Codex sessions directory",
@@ -251,6 +271,14 @@ const STRINGS = {
 		en: "Ollama naming/summary model",
 		ja: "Ollama 命名・要約モデル",
 	},
+	"settings.ollamaSummaries.name": {
+		en: "Use Ollama for names and patterns",
+		ja: "Ollamaでクラスタ名・パターンを生成",
+	},
+	"settings.ollamaSummaries.desc": {
+		en: "Off by default. When enabled, recent prompts and commands are sent to the configured Ollama endpoint",
+		ja: "既定はオフ。有効時は最近のプロンプトとコマンドを設定したOllama endpointへ送信する",
+	},
 	"settings.ollamaChat.desc": {
 		en: "Small local LLM used to name clusters and summarize common patterns",
 		ja: "クラスタ名・共通パターンの生成に使う小型ローカルLLM",
@@ -265,8 +293,16 @@ const STRINGS = {
 		ja: "Skill 候補化の閾値",
 	},
 	"settings.skillThreshold.desc": {
-		en: "Mark a cluster as a skill candidate when it reaches this many sessions",
-		ja: "クラスタの所属セッション数がこの値に達すると Skill 候補として提示する",
+		en: "Mark a cohesive cluster as a skill candidate when it reaches this many recent, unique sessions",
+		ja: "まとまりのあるクラスタが、期間内にこの件数の重複なしセッションへ達するとSkill候補にする",
+	},
+	"settings.skillLookback.name": {
+		en: "Skill candidate lookback (days)",
+		ja: "Skill候補の評価期間（日）",
+	},
+	"settings.skillLookback.desc": {
+		en: "Only recent, unique sessions count toward skill candidacy. Use 0 for all time (default: 30)",
+		ja: "期間内の重複を除いたセッションだけを候補判定に数える。0で全期間（既定: 30）",
 	},
 	"settings.heading.actions": { en: "Resume and skills", ja: "Resume・Skill 化" },
 	"settings.terminal.name": { en: "Terminal", ja: "ターミナル" },
@@ -288,8 +324,8 @@ const STRINGS = {
 		ja: "Skill 化コマンドのテンプレート",
 	},
 	"settings.skillTemplate.desc": {
-		en: "{repo} = target directory, {brief} = absolute path of the brief",
-		ja: "{repo} = 対象ディレクトリ、{brief} = ブリーフの絶対パス に置換される",
+		en: "{repo} = target directory, {brief} = absolute brief path. Both placeholders are shell-escaped",
+		ja: "{repo} = 対象ディレクトリ、{brief} = ブリーフの絶対パス。どちらもシェル用に安全に引用される",
 	},
 } as const;
 
@@ -303,7 +339,7 @@ export function setLocale(l: Locale | null): void {
 }
 
 export function t(key: I18nKey, vars?: Record<string, string | number>): string {
-	const l = locale ?? detectLocale();
+	const l = currentLocale();
 	let text: string = STRINGS[key][l];
 	if (vars) {
 		for (const [k, v] of Object.entries(vars)) {

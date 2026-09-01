@@ -1,7 +1,7 @@
 import type { DataAdapter } from "obsidian";
 import type { EmbeddingCache, LedgerData } from "./types";
 
-const LEDGER_VERSION = 1;
+const LEDGER_VERSION = 2;
 
 /**
  * 内部データ層(設計書 §2.2)。
@@ -18,7 +18,7 @@ export class Ledger {
 	constructor(
 		private adapter: DataAdapter,
 		private hostname: string,
-		configDir: string
+		configDir: string,
 	) {
 		this.dir = `${configDir}/plugins/agent-constellation/data`;
 		this.data = {
@@ -27,6 +27,8 @@ export class Ledger {
 			sessions: {},
 			clusters: {},
 			skipped: {},
+			edges: [],
+			edgeSignature: "",
 		};
 		this.embeddings = { version: LEDGER_VERSION, model: "", entries: {} };
 	}
@@ -52,6 +54,9 @@ export class Ledger {
 					this.data = parsed;
 					this.data.hostname = this.hostname;
 					if (!this.data.skipped) this.data.skipped = {};
+					if (!this.data.edges) this.data.edges = [];
+					if (!this.data.edgeSignature) this.data.edgeSignature = "";
+					this.migrateSessionKeys();
 				}
 			}
 		} catch (e) {
@@ -66,6 +71,53 @@ export class Ledger {
 		} catch (e) {
 			console.error("[agent-constellation] embeddingキャッシュの読み込みに失敗しました", e);
 		}
+		this.migrateEmbeddingKeys();
+	}
+
+	/** v1 の sessionId 単独キーを source:sessionId へ移行する。 */
+	private migrateSessionKeys(): void {
+		const oldSessions = this.data.sessions as Record<string, import("./types").StoredSession>;
+		const next: Record<string, import("./types").StoredSession> = {};
+		const idToKeys = new Map<string, string[]>();
+		for (const [oldKey, session] of Object.entries(oldSessions)) {
+			const key =
+				session.key || `${session.source ?? "codex"}:${session.sessionId || oldKey}`;
+			session.key = key;
+			const legacy = session as import("./types").StoredSession & {
+				lastAssistantMessage?: string | null;
+			};
+			if (legacy.lastAssistantMessage === undefined) session.lastAssistantMessage = null;
+			next[key] = session;
+			const keys = idToKeys.get(session.sessionId) ?? [];
+			keys.push(key);
+			idToKeys.set(session.sessionId, keys);
+		}
+		this.data.sessions = next;
+		for (const cluster of Object.values(this.data.clusters)) {
+			cluster.members = cluster.members
+				.map((member) => (next[member] ? member : idToKeys.get(member)?.[0]))
+				.filter((member): member is string => !!member);
+			if (cluster.recentMembers) {
+				cluster.recentMembers = cluster.recentMembers
+					.map((member) => (next[member] ? member : idToKeys.get(member)?.[0]))
+					.filter((member): member is string => !!member);
+			}
+		}
+		this.data.version = LEDGER_VERSION;
+	}
+
+	private migrateEmbeddingKeys(): void {
+		const next: EmbeddingCache["entries"] = {};
+		for (const [oldKey, entry] of Object.entries(this.embeddings.entries)) {
+			if (this.data.sessions[oldKey]) {
+				next[oldKey] = entry;
+				continue;
+			}
+			const matches = Object.values(this.data.sessions).filter((s) => s.sessionId === oldKey);
+			for (const session of matches) next[session.key] = entry;
+		}
+		this.embeddings.entries = next;
+		this.embeddings.version = LEDGER_VERSION;
 	}
 
 	private async ensureDir(): Promise<void> {

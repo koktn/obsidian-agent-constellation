@@ -13,6 +13,7 @@ import type { StoredCluster, StoredSession } from "../src/types";
 
 function session(over: Partial<StoredSession> = {}): StoredSession {
 	return {
+		key: "codex:0198aaaa-bbbb",
 		sessionId: "0198aaaa-bbbb",
 		source: "codex",
 		filePath: "/Users/me/.codex/sessions/2026/07/21/rollout-x.jsonl",
@@ -28,6 +29,7 @@ function session(over: Partial<StoredSession> = {}): StoredSession {
 		commands: ["npm i -D husky lint-staged"],
 		files: [".husky/pre-commit", "package.json"],
 		turns: 1,
+		lastAssistantMessage: "設定完了",
 		summary: "依頼: husky…\n結果: 設定完了",
 		notePath: "_Constellation/sessions/2026-07-21 pre-commitフック設定.md",
 		...over,
@@ -36,9 +38,7 @@ function session(over: Partial<StoredSession> = {}): StoredSession {
 
 describe("sanitizeFileName / sanitizeTag", () => {
 	it("ファイル名に使えない文字を除去する", () => {
-		expect(sanitizeFileName('a/b:c*d?"e<f>g|h#i^j[k]l')).toBe(
-			"a b c d e f g h i j k l"
-		);
+		expect(sanitizeFileName('a/b:c*d?"e<f>g|h#i^j[k]l')).toBe("a b c d e f g h i j k l");
 	});
 	it("タグを安全な形にする", () => {
 		expect(sanitizeTag("git hooks 設定")).toBe("git-hooks-設定");
@@ -48,7 +48,7 @@ describe("sanitizeFileName / sanitizeTag", () => {
 describe("makeTitle", () => {
 	it("先頭プロンプトから短いタイトルを作る", () => {
 		expect(makeTitle("huskyでpre-commitにlint-stagedを設定して", "id")).toBe(
-			"huskyでpre-commitにlint-stagedを設定して"
+			"huskyでpre-commitにlint-stagedを設定して",
 		);
 	});
 	it("長文は40文字に切る", () => {
@@ -60,22 +60,26 @@ describe("makeTitle", () => {
 });
 
 describe("makeSummary", () => {
-	it("依頼と結果の2行を作る", () => {
+	it("目的と結果を構造化する", () => {
 		const s = makeSummary("やって", "やりました");
-		expect(s).toContain("依頼: やって");
-		expect(s).toContain("結果: やりました");
+		expect(s).toContain("**目的:** やって");
+		expect(s).toContain("**結果:** やりました");
+	});
+
+	it("英語と変更内容を出力する", () => {
+		const s = makeSummary("Fix it", "Fixed", ["npm test"], ["src/main.ts"], "en");
+		expect(s).toContain("**Goal:** Fix it");
+		expect(s).toContain("**Outcome:** Fixed");
+		expect(s).toContain("**Key changes:** `src/main.ts`");
+		expect(s).toContain("**Main command:** `npm test`");
 	});
 });
 
 describe("renderSessionNote", () => {
-	const md = renderSessionNote(
-		session(),
-		[{ noteBasename: "2026-07-10 husky導入" }],
-		{
-			clusterId: "git-hooks",
-			notePath: "_Constellation/clusters/cluster - git-hooks.md",
-		}
-	);
+	const md = renderSessionNote(session(), [{ noteBasename: "2026-07-10 husky導入" }], {
+		clusterId: "git-hooks",
+		notePath: "_Constellation/clusters/cluster - git-hooks.md",
+	});
 
 	it("frontmatter に必須項目を含む", () => {
 		expect(md).toContain("type: agent-session");
@@ -92,6 +96,20 @@ describe("renderSessionNote", () => {
 		expect(md).toContain("[[cluster - git-hooks]]");
 		expect(md).toContain("```resume");
 		expect(md).toContain("session_id: 0198aaaa-bbbb");
+	});
+
+	it("英語の見出しとlanguage frontmatterを生成する", () => {
+		const english = renderSessionNote(
+			session({ summary: "- **Goal:** Configure hooks" }),
+			[],
+			null,
+			"en",
+		);
+		expect(english).toContain("language: en");
+		expect(english).toContain("## Prompt");
+		expect(english).toContain("## Summary");
+		expect(english).toContain("## Commands");
+		expect(english).not.toContain("## 概要");
 	});
 });
 
@@ -135,5 +153,15 @@ describe("renderClusterNote / summarizeCommonPatterns / renderBrief", () => {
 		expect(md).toContain("huskyでpre-commitにlint-stagedを設定して");
 		expect(md).toContain("npx husky init");
 		expect(md).toContain("パラメータ候補");
+	});
+
+	it("英語のクラスタノートとブリーフを生成する", () => {
+		const hub = renderClusterNote(cluster, sessions, "Common commands", "en");
+		const brief = renderBrief(cluster, sessions, "Common commands", "en");
+		expect(hub).toContain("## Sessions");
+		expect(hub).toContain("## Common pattern");
+		expect(brief).toContain("# Skill brief:");
+		expect(brief).toContain("Target: myapp");
+		expect(brief).toContain("## Session prompts");
 	});
 });
